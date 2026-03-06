@@ -10,16 +10,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: {
-    fetch: (url, options) => {
-      // 20-second timeout on all Supabase requests to prevent infinite hangs
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-      return fetch(url, {
-        ...options,
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeoutId));
-    },
-  },
-});
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Export raw config for direct PostgREST calls that bypass the JS client
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseAnonKey;
