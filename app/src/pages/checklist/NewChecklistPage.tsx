@@ -18,7 +18,6 @@ export function NewChecklistPage() {
   const navigate = useNavigate();
   const store = useChecklistStore();
   const profile = useAuthStore((s) => s.profile);
-  const appSession = useAuthStore((s) => s.appSession);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
