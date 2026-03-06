@@ -26,11 +26,15 @@ export function VehicleInfoStep({
 
   const canLookup = vehicleInfo.vehicleRegistration.trim().length >= 2 && !isLookingUp;
 
-  // Require driver HR code and name, plus VRM
+  // Require driver HR code, name, VRM, and mileage (positive integer)
+  const mileageNum = parseInt(vehicleInfo.mileage, 10);
   const canProceed =
     driverInfo.hrCode.trim().length > 0 &&
     driverInfo.name.trim().length > 0 &&
-    vehicleInfo.vehicleRegistration.trim().length > 0;
+    vehicleInfo.vehicleRegistration.trim().length > 0 &&
+    vehicleInfo.mileage.trim().length > 0 &&
+    !isNaN(mileageNum) &&
+    mileageNum > 0;
 
   const handleLookup = async () => {
     setIsLookingUp(true);
@@ -133,14 +137,16 @@ export function VehicleInfoStep({
         <div className="lookup-warning">{lookupError}</div>
       )}
 
-      <label htmlFor="mileage">Mileage</label>
+      <label htmlFor="mileage">Mileage *</label>
       <input
         id="mileage"
         type="number"
         inputMode="numeric"
+        min="1"
         value={vehicleInfo.mileage}
         onChange={(e) => onChange({ mileage: e.target.value })}
         placeholder="Current mileage"
+        required
       />
 
       <label htmlFor="make-model">Make & Model {lookupDone && '(auto-filled)'}</label>

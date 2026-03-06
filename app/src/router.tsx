@@ -7,6 +7,7 @@ import { HomePage } from './pages/checklist/HomePage';
 import { NewChecklistPage } from './pages/checklist/NewChecklistPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminSubmissions } from './pages/admin/AdminSubmissions';
+import { AdminSubmissionDetail } from './pages/admin/AdminSubmissionDetail';
 import { AdminChecklists } from './pages/admin/AdminChecklists';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminSessions } from './pages/admin/AdminSessions';
@@ -55,6 +56,10 @@ export const router = createBrowserRouter([
       {
         path: 'submissions',
         element: <AdminSubmissions />,
+      },
+      {
+        path: 'submissions/:id',
+        element: <AdminSubmissionDetail />,
       },
       {
         path: 'checklists',

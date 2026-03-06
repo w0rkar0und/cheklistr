@@ -183,63 +183,82 @@ export function NewChecklistPage() {
         }
       }
 
-      // ── Step 3: Upload vehicle photos ──
+      // ── Step 3: Upload vehicle photos (parallel, 3 at a time) ──
       const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
         ([, pd]) => pd.file != null
       );
-      console.log('[SUBMIT] Step 3:', photoEntries.length, 'photos');
-      let photoIdx = 0;
+      console.log('[SUBMIT] Step 3:', photoEntries.length, 'photos (parallel)');
+      setSubmitProgress(`Step 3/5: Uploading ${photoEntries.length} photos…`);
 
-      for (const [photoType, photoData] of photoEntries) {
-        if (!photoData.file) continue;
-        photoIdx++;
-        setSubmitProgress(`Step 3/5: Photo ${photoIdx}/${photoEntries.length}…`);
-
-        try {
-          const compressed = await compressImage(photoData.file);
-          console.log(`[SUBMIT] Photo ${photoType}: ${(photoData.file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
-
-          const filePath = `${submissionId}/${photoType}.jpg`;
-          const { error: uploadError } = await withTimeout(
-            supabase.storage
-              .from('vehicle-photos')
-              .upload(filePath, compressed, { contentType: 'image/jpeg', upsert: false }),
-            30000,
-            `Photo upload ${photoType}`
-          );
-
-          if (uploadError) {
-            console.error(`[SUBMIT] Photo upload FAILED (${photoType}):`, JSON.stringify(uploadError));
-            continue;
+      // Compress all photos first (CPU-bound, fast)
+      const compressedPhotos = await Promise.all(
+        photoEntries.map(async ([photoType, photoData]) => {
+          if (!photoData.file) return null;
+          try {
+            const compressed = await compressImage(photoData.file);
+            console.log(`[SUBMIT] Compressed ${photoType}: ${(photoData.file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
+            return { photoType, compressed };
+          } catch {
+            console.error(`[SUBMIT] Compression failed for ${photoType}`);
+            return null;
           }
+        })
+      );
 
-          const { data: urlData } = supabase.storage
-            .from('vehicle-photos')
-            .getPublicUrl(filePath);
+      // Upload in parallel batches of 3 (avoids overwhelming the connection)
+      const validPhotos = compressedPhotos.filter(Boolean) as { photoType: string; compressed: File }[];
+      const BATCH_SIZE = 3;
+      let uploadedCount = 0;
 
-          await withTimeout(
-            fetch(`${SUPABASE_URL}/rest/v1/submission_photos`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'return=minimal',
-              },
-              body: JSON.stringify({
-                submission_id: submissionId,
-                photo_type: photoType,
-                storage_url: urlData.publicUrl,
-              }),
-            }),
-            15000,
-            `Photo record ${photoType}`
-          );
-          console.log(`[SUBMIT] Photo ${photoType} OK`);
-        } catch (photoErr) {
-          console.error(`[SUBMIT] Photo exception (${photoType}):`, photoErr);
-          // Continue — don't block on one photo
-        }
+      for (let batch = 0; batch < validPhotos.length; batch += BATCH_SIZE) {
+        const chunk = validPhotos.slice(batch, batch + BATCH_SIZE);
+        await Promise.all(
+          chunk.map(async ({ photoType, compressed }) => {
+            try {
+              const filePath = `${submissionId}/${photoType}.jpg`;
+              const { error: uploadError } = await withTimeout(
+                supabase.storage
+                  .from('vehicle-photos')
+                  .upload(filePath, compressed, { contentType: 'image/jpeg', upsert: false }),
+                30000,
+                `Photo upload ${photoType}`
+              );
+
+              if (uploadError) {
+                console.error(`[SUBMIT] Photo upload FAILED (${photoType}):`, JSON.stringify(uploadError));
+                return;
+              }
+
+              const { data: urlData } = supabase.storage
+                .from('vehicle-photos')
+                .getPublicUrl(filePath);
+
+              await withTimeout(
+                fetch(`${SUPABASE_URL}/rest/v1/submission_photos`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Prefer': 'return=minimal',
+                  },
+                  body: JSON.stringify({
+                    submission_id: submissionId,
+                    photo_type: photoType,
+                    storage_url: urlData.publicUrl,
+                  }),
+                }),
+                15000,
+                `Photo record ${photoType}`
+              );
+              uploadedCount++;
+              console.log(`[SUBMIT] Photo ${photoType} OK (${uploadedCount}/${validPhotos.length})`);
+            } catch (photoErr) {
+              console.error(`[SUBMIT] Photo exception (${photoType}):`, photoErr);
+            }
+          })
+        );
+        setSubmitProgress(`Step 3/5: ${Math.min(batch + BATCH_SIZE, validPhotos.length)}/${validPhotos.length} photos…`);
       }
 
       // ── Step 4: Insert defects ──

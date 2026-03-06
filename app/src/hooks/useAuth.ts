@@ -7,6 +7,24 @@ import { useAuthStore } from '../stores/authStore';
 const SESSION_CHECK_INTERVAL = 5 * 60 * 1000;
 
 /**
+ * Read the full Supabase session object from localStorage.
+ * The Supabase JS client stores it under `sb-{projectRef}-auth-token`.
+ * This avoids calling supabase.auth.getSession() which can hang.
+ */
+function getSessionFromStorage() {
+  try {
+    const url = import.meta.env.VITE_SUPABASE_URL as string;
+    const projectRef = new URL(url).hostname.split('.')[0];
+    const storageKey = `sb-${projectRef}-auth-token`;
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Hook that initialises and manages authentication state.
  * Call this ONCE in the root App component — never in child components.
  */
@@ -18,7 +36,9 @@ export function useAuth() {
     const initialise = async () => {
       store.setLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Read auth session directly from localStorage (instant, never hangs).
+        // supabase.auth.getSession() can hang indefinitely during token refresh.
+        const session = getSessionFromStorage();
         if (session?.user) {
           store.setAuthUser(session.user);
           const { data: profile } = await fetchUserProfile(session.user.id);

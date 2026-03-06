@@ -4,8 +4,8 @@
  * and resizes to fit within maxDimension while maintaining aspect ratio.
  */
 
-const MAX_DIMENSION = 1920; // Max width or height in pixels
-const JPEG_QUALITY = 0.75; // 75% quality — good balance of size vs quality
+const MAX_DIMENSION = 1280; // Max width or height in pixels (1280 is plenty for inspection photos)
+const JPEG_QUALITY = 0.6; // 60% quality — keeps files under ~500KB while retaining clarity
 
 /**
  * Compress an image File to a JPEG Blob.

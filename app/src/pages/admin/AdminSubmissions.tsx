@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import type { Submission } from '../../types/database';
 
 export function AdminSubmissions() {
+  const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
@@ -71,7 +73,12 @@ export function AdminSubmissions() {
             </thead>
             <tbody>
               {filteredSubmissions.map((sub) => (
-                <tr key={sub.id}>
+                <tr
+                  key={sub.id}
+                  onClick={() => navigate(`/admin/submissions/${sub.id}`)}
+                  style={{ cursor: 'pointer' }}
+                  className="clickable-row"
+                >
                   <td className="td-mono">{sub.vehicle_registration}</td>
                   <td>
                     {sub.contractor_name}
