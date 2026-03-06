@@ -12,6 +12,7 @@ interface ReviewStepProps {
   tsFormReviewed: string | null;
   isSubmitting: boolean;
   submitProgress?: string;
+  submitError?: string | null;
   onSubmit: () => void;
   onBack: () => void;
 }
@@ -27,6 +28,7 @@ export function ReviewStep({
   tsFormReviewed,
   isSubmitting,
   submitProgress,
+  submitError,
   onSubmit,
   onBack,
 }: ReviewStepProps) {
@@ -151,6 +153,11 @@ export function ReviewStep({
           </span>
         </div>
       </div>
+
+      {/* Error display near the button so it's visible on mobile */}
+      {submitError && (
+        <div className="error-message" style={{ marginBottom: '1rem' }}>{submitError}</div>
+      )}
 
       {/* Actions */}
       <div className="form-step-actions">

@@ -75,18 +75,23 @@ export function NewChecklistPage() {
 
     setIsSubmitting(true);
     setSubmitError(null);
-    setSubmitProgress('Creating submission record…');
+    setSubmitProgress('Step 1/5: Creating submission…');
+    console.log('[SUBMIT] Starting submission…');
 
     try {
       // 1. Create the submission record
+      // Trim HR code to 7 chars max (VARCHAR(7) constraint)
+      const hrCode = store.driverInfo.hrCode ? store.driverInfo.hrCode.substring(0, 7) : null;
+
+      console.log('[SUBMIT] Step 1: Inserting submission record…');
       const { data: submission, error: subError } = await supabase
         .from('submissions')
         .insert({
           user_id: profile.id,
-          session_id: appSession?.id ?? null,
+          session_id: null, // Deliberately null — avoids FK issues with expired sessions
           checklist_version_id: store.version.id,
           status: 'submitted',
-          contractor_id: store.driverInfo.hrCode || null,
+          contractor_id: hrCode,
           contractor_name: store.driverInfo.name || null,
           vehicle_registration: store.vehicleInfo.vehicleRegistration,
           mileage: store.vehicleInfo.mileage ? parseInt(store.vehicleInfo.mileage, 10) : null,
@@ -100,15 +105,18 @@ export function NewChecklistPage() {
           ts_form_reviewed: store.tsFormReviewed,
           ts_form_submitted: new Date().toISOString(),
         })
-        .select()
+        .select('id')
         .single();
 
       if (subError || !submission) {
+        console.error('[SUBMIT] Step 1 FAILED:', subError);
         throw new Error(subError?.message ?? 'Failed to create submission');
       }
+      console.log('[SUBMIT] Step 1 OK — submission id:', submission.id);
 
       // 2. Insert checklist responses
-      setSubmitProgress('Saving checklist responses…');
+      setSubmitProgress('Step 2/5: Saving responses…');
+      console.log('[SUBMIT] Step 2: Inserting checklist responses…');
       const responseRows = Array.from(store.responses.values())
         .filter((r) => hasValue(r))
         .map((r) => ({
@@ -125,24 +133,32 @@ export function NewChecklistPage() {
           .from('checklist_responses')
           .insert(responseRows);
         if (respError) {
-          console.error('Response insert error:', respError);
+          console.error('[SUBMIT] Step 2 FAILED:', respError);
+          // Non-fatal: continue even if responses fail
+        } else {
+          console.log('[SUBMIT] Step 2 OK —', responseRows.length, 'responses saved');
         }
+      } else {
+        console.log('[SUBMIT] Step 2 OK — no responses to save');
       }
 
       // 3. Upload vehicle photos (compressed) and insert records
       const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
         ([, pd]) => pd.file != null
       );
+      console.log('[SUBMIT] Step 3: Uploading', photoEntries.length, 'vehicle photos…');
       let photoIdx = 0;
 
       for (const [photoType, photoData] of photoEntries) {
         if (!photoData.file) continue;
         photoIdx++;
-        setSubmitProgress(`Uploading photo ${photoIdx}/${photoEntries.length}…`);
+        setSubmitProgress(`Step 3/5: Photo ${photoIdx}/${photoEntries.length}…`);
+        console.log(`[SUBMIT] Step 3: Compressing ${photoType} (${(photoData.file.size / 1024).toFixed(0)}KB)…`);
 
         try {
           // Compress image to JPEG, max 1920px, ~75% quality
           const compressed = await compressImage(photoData.file);
+          console.log(`[SUBMIT] Step 3: Uploading ${photoType} (${(compressed.size / 1024).toFixed(0)}KB)…`);
 
           const filePath = `${submission.id}/${photoType}.jpg`;
           const { error: uploadError } = await supabase.storage
@@ -153,7 +169,7 @@ export function NewChecklistPage() {
             });
 
           if (uploadError) {
-            console.error(`Photo upload error (${photoType}):`, uploadError);
+            console.error(`[SUBMIT] Step 3: Upload FAILED (${photoType}):`, uploadError);
             continue;
           }
 
@@ -170,17 +186,21 @@ export function NewChecklistPage() {
             });
 
           if (photoRecordError) {
-            console.error(`Photo record error (${photoType}):`, photoRecordError);
+            console.error(`[SUBMIT] Step 3: Record FAILED (${photoType}):`, photoRecordError);
+          } else {
+            console.log(`[SUBMIT] Step 3: ${photoType} uploaded OK`);
           }
         } catch (photoErr) {
-          console.error(`Photo processing error (${photoType}):`, photoErr);
-          // Continue with other photos — don't let one failure block everything
+          console.error(`[SUBMIT] Step 3: Processing FAILED (${photoType}):`, photoErr);
         }
       }
 
       // 4. Insert defects
       if (store.defects.length > 0) {
-        setSubmitProgress('Saving defects…');
+        setSubmitProgress('Step 4/5: Saving defects…');
+        console.log('[SUBMIT] Step 4: Inserting', store.defects.length, 'defects…');
+      } else {
+        console.log('[SUBMIT] Step 4: No defects to save');
       }
 
       for (let i = 0; i < store.defects.length; i++) {
@@ -188,7 +208,7 @@ export function NewChecklistPage() {
         let defectImageUrl: string | null = null;
 
         if (defect.imageFile) {
-          setSubmitProgress(`Uploading defect photo ${i + 1}/${store.defects.length}…`);
+          setSubmitProgress(`Step 4/5: Defect photo ${i + 1}/${store.defects.length}…`);
 
           try {
             const compressed = await compressImage(defect.imageFile);
@@ -206,10 +226,10 @@ export function NewChecklistPage() {
                 .getPublicUrl(filePath);
               defectImageUrl = urlData.publicUrl;
             } else {
-              console.error(`Defect photo upload error (${i + 1}):`, uploadError);
+              console.error(`[SUBMIT] Step 4: Defect photo upload FAILED (${i + 1}):`, uploadError);
             }
           } catch (defectPhotoErr) {
-            console.error(`Defect photo processing error (${i + 1}):`, defectPhotoErr);
+            console.error(`[SUBMIT] Step 4: Defect photo processing FAILED (${i + 1}):`, defectPhotoErr);
           }
         }
 
@@ -221,17 +241,19 @@ export function NewChecklistPage() {
         });
 
         if (defectError) {
-          console.error(`Defect insert error (${i + 1}):`, defectError);
+          console.error(`[SUBMIT] Step 4: Defect insert FAILED (${i + 1}):`, defectError);
         }
       }
 
       // 5. Navigate to success
-      setSubmitProgress('Done!');
+      setSubmitProgress('Step 5/5: Complete!');
+      console.log('[SUBMIT] Step 5: All done — navigating home');
       store.resetForm();
       navigate('/', { replace: true });
     } catch (err) {
-      console.error('Submission error:', err);
-      setSubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.');
+      console.error('[SUBMIT] FATAL ERROR:', err);
+      const msg = err instanceof Error ? err.message : 'Submission failed';
+      setSubmitError(`Error: ${msg}. Check console for details.`);
     } finally {
       setIsSubmitting(false);
       setSubmitProgress('');
@@ -354,6 +376,7 @@ export function NewChecklistPage() {
           tsFormReviewed={store.tsFormReviewed}
           isSubmitting={isSubmitting}
           submitProgress={submitProgress}
+          submitError={submitError}
           onSubmit={handleSubmit}
           onBack={() => goToStep('defects')}
         />
