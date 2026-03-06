@@ -8,7 +8,7 @@ import { VehiclePhotosStep } from '../../components/checklist/VehiclePhotosStep'
 import { ChecklistSectionView } from '../../components/checklist/ChecklistSectionView';
 import { DefectsStep } from '../../components/checklist/DefectsStep';
 import { ReviewStep } from '../../components/checklist/ReviewStep';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
 import type { ResponseValue } from '../../stores/checklistStore';
 
@@ -87,17 +87,13 @@ export function NewChecklistPage() {
     setSubmitProgress('Checking auth…');
 
     try {
-      // ── Pre-flight: verify auth token is valid ──
-      console.log('[SUBMIT] Pre-flight: checking auth session…');
-      const { data: sessionData, error: sessionErr } = await withTimeout(
-        supabase.auth.getSession(),
-        10000,
-        'Auth check'
-      );
-      if (sessionErr || !sessionData.session) {
-        throw new Error('Auth session expired. Please log out and log back in.');
+      // ── Pre-flight: read auth token directly from localStorage ──
+      // supabase.auth.getSession() hangs during token refresh, so we bypass it entirely.
+      console.log('[SUBMIT] Pre-flight: reading token from localStorage…');
+      const accessToken = getAccessTokenFromStorage();
+      if (!accessToken) {
+        throw new Error('No auth token found. Please log out and log back in.');
       }
-      const accessToken = sessionData.session.access_token;
       console.log('[SUBMIT] Auth OK — token length:', accessToken.length);
 
       // ── Step 1: Insert submission via raw fetch (bypasses Supabase JS client) ──
