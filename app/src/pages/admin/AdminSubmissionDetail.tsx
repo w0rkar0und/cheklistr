@@ -18,16 +18,20 @@ export function AdminSubmissionDetail() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Collect all viewable images (submission photos + defect photos) for lightbox
-  const allImages: { url: string; label: string }[] = [];
-  if (submission) {
-    submission.photos.forEach((p) =>
-      allImages.push({ url: p.storage_url, label: p.photo_type.replace(/_/g, ' ') })
-    );
-    submission.defects.forEach((d) => {
-      if (d.image_url)
-        allImages.push({ url: d.image_url, label: `Defect #${d.defect_number}` });
-    });
-  }
+  const allImages: { url: string; label: string }[] = submission
+    ? [
+        ...submission.photos.map((p) => ({
+          url: p.storage_url,
+          label: p.photo_type.replace(/_/g, ' '),
+        })),
+        ...submission.defects
+          .filter((d) => d.image_url)
+          .map((d) => ({
+            url: d.image_url!,
+            label: `Defect #${d.defect_number}`,
+          })),
+      ]
+    : [];
 
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   const prevImage = useCallback(() => {
@@ -242,23 +246,23 @@ export function AdminSubmissionDetail() {
         <section className="detail-section">
           <h3>Vehicle Photos ({submission.photos.length})</h3>
           <div className="photo-grid">
-            {submission.photos.map((photo) => {
-              const imgIdx = allImages.findIndex((img) => img.url === photo.storage_url);
-              return (
-                <div
-                  key={photo.id}
-                  className="photo-card photo-card--clickable"
-                  onClick={() => setLightboxIndex(imgIdx >= 0 ? imgIdx : 0)}
-                >
-                  <img
-                    src={photo.storage_url}
-                    alt={photo.photo_type}
-                    loading="lazy"
-                  />
-                  <span className="photo-label">{photo.photo_type.replace(/_/g, ' ')}</span>
-                </div>
-              );
-            })}
+            {submission.photos.map((photo, idx) => (
+              <div
+                key={photo.id}
+                className="photo-card photo-card--clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setLightboxIndex(idx)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setLightboxIndex(idx); }}
+              >
+                <img
+                  src={photo.storage_url}
+                  alt={photo.photo_type}
+                  loading="lazy"
+                />
+                <span className="photo-label">{photo.photo_type.replace(/_/g, ' ')}</span>
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -278,6 +282,8 @@ export function AdminSubmissionDetail() {
                     alt={`Defect ${defect.defect_number}`}
                     loading="lazy"
                     className="defect-image defect-image--clickable"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       const idx = allImages.findIndex((img) => img.url === defect.image_url);
                       if (idx >= 0) setLightboxIndex(idx);
