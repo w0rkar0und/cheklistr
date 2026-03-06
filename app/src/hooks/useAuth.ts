@@ -27,17 +27,24 @@ function getSessionFromStorage() {
 /**
  * Hook that initialises and manages authentication state.
  * Call this ONCE in the root App component — never in child components.
+ *
+ * IMPORTANT: We avoid supabase.auth.getSession() entirely because it
+ * hangs indefinitely during token refresh on the Supabase JS client.
+ * Instead we read the session from localStorage directly.
+ *
+ * We also defer the onAuthStateChange subscription so it doesn't
+ * block initialisation (it internally calls getSession() too).
  */
 export function useAuth() {
   const store = useAuthStore();
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   useEffect(() => {
     const initialise = async () => {
       store.setLoading(true);
       try {
         // Read auth session directly from localStorage (instant, never hangs).
-        // supabase.auth.getSession() can hang indefinitely during token refresh.
         const session = getSessionFromStorage();
         if (session?.user) {
           store.setAuthUser(session.user);
@@ -45,8 +52,6 @@ export function useAuth() {
           if (profile) {
             store.setProfile(profile);
           }
-          // Note: we don't recreate an app session on page reload —
-          // the user must re-authenticate if the session expired
         }
       } catch (error) {
         console.error('Auth initialisation error:', error);
@@ -54,35 +59,42 @@ export function useAuth() {
         store.setLoading(false);
         store.setInitialised(true);
       }
+
+      // Defer the auth state change listener so it doesn't block init.
+      // onAuthStateChange internally calls getSession() which can hang,
+      // but by this point the UI is already rendered and interactive.
+      // We wrap it in setTimeout to yield to the event loop first.
+      setTimeout(() => {
+        try {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+              if (useAuthStore.getState().suppressAuthEvents) {
+                return;
+              }
+
+              if (event === 'SIGNED_IN' && session?.user) {
+                store.setAuthUser(session.user);
+                const { data: profile } = await fetchUserProfile(session.user.id);
+                if (profile) {
+                  store.setProfile(profile);
+                }
+              } else if (event === 'SIGNED_OUT') {
+                stopSessionChecks();
+                store.reset();
+              }
+            }
+          );
+          subscriptionRef.current = subscription;
+        } catch (err) {
+          console.error('Failed to subscribe to auth state changes:', err);
+        }
+      }, 0);
     };
 
     initialise();
 
-    // Listen for Supabase auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // Skip processing when admin is creating a new user
-        // (signUp + setSession fire rapid auth events that would
-        //  blow out the admin's profile)
-        if (useAuthStore.getState().suppressAuthEvents) {
-          return;
-        }
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          store.setAuthUser(session.user);
-          const { data: profile } = await fetchUserProfile(session.user.id);
-          if (profile) {
-            store.setProfile(profile);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          stopSessionChecks();
-          store.reset();
-        }
-      }
-    );
-
     return () => {
-      subscription.unsubscribe();
+      subscriptionRef.current?.unsubscribe();
       stopSessionChecks();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
