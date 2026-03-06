@@ -64,7 +64,7 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
             onChange={handleCapture}
             className="image-input"
             id={`field-${item.id}`}

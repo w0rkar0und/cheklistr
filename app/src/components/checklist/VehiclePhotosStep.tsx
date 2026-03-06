@@ -144,7 +144,7 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
         ref={inputRef}
         id={`photo-${photoType}`}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         onChange={handleCapture}
         className="photo-slot-input"
       />

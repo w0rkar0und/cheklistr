@@ -132,7 +132,7 @@ function DefectCard({ defect, index, onUpdate, onRemove }: DefectCardProps) {
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
             onChange={handleImageCapture}
             id={`defect-image-${defect.id}`}
             className="photo-slot-input"
