@@ -76,18 +76,23 @@ export function NewChecklistPage() {
     setSubmitError(null);
     setSubmitProgress('Step 1/5: Creating submission…');
     console.log('[SUBMIT] Starting submission…');
+    console.log('[SUBMIT] Auth user id:', profile.id);
+    console.log('[SUBMIT] Checklist version id:', store.version.id);
 
     try {
-      // 1. Create the submission record
-      // Trim HR code to 7 chars max (VARCHAR(7) constraint)
+      // Generate UUID client-side so we never need .select().single()
+      // which hangs when PostgREST can't return the row after insert
+      const submissionId = crypto.randomUUID();
       const hrCode = store.driverInfo.hrCode ? store.driverInfo.hrCode.substring(0, 7) : null;
 
-      console.log('[SUBMIT] Step 1: Inserting submission record…');
-      const { data: submission, error: subError } = await supabase
+      // 1. Insert submission (no .select() — we already have the ID)
+      console.log('[SUBMIT] Step 1: Inserting submission', submissionId);
+      const { error: subError } = await supabase
         .from('submissions')
         .insert({
+          id: submissionId,
           user_id: profile.id,
-          session_id: null, // Deliberately null — avoids FK issues with expired sessions
+          session_id: null,
           checklist_version_id: store.version.id,
           status: 'submitted',
           contractor_id: hrCode,
@@ -103,23 +108,21 @@ export function NewChecklistPage() {
           ts_form_started: store.tsFormStarted,
           ts_form_reviewed: store.tsFormReviewed,
           ts_form_submitted: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+        });
 
-      if (subError || !submission) {
-        console.error('[SUBMIT] Step 1 FAILED:', subError);
-        throw new Error(subError?.message ?? 'Failed to create submission');
+      if (subError) {
+        console.error('[SUBMIT] Step 1 FAILED:', JSON.stringify(subError));
+        throw new Error(`Submission failed: ${subError.message} (code: ${subError.code})`);
       }
-      console.log('[SUBMIT] Step 1 OK — submission id:', submission.id);
+      console.log('[SUBMIT] Step 1 OK');
 
       // 2. Insert checklist responses
       setSubmitProgress('Step 2/5: Saving responses…');
-      console.log('[SUBMIT] Step 2: Inserting checklist responses…');
+      console.log('[SUBMIT] Step 2: Inserting responses…');
       const responseRows = Array.from(store.responses.values())
         .filter((r) => hasValue(r))
         .map((r) => ({
-          submission_id: submission.id,
+          submission_id: submissionId,
           checklist_item_id: r.itemId,
           value_boolean: r.valueBoolean,
           value_text: r.valueText,
@@ -132,43 +135,37 @@ export function NewChecklistPage() {
           .from('checklist_responses')
           .insert(responseRows);
         if (respError) {
-          console.error('[SUBMIT] Step 2 FAILED:', respError);
-          // Non-fatal: continue even if responses fail
+          console.error('[SUBMIT] Step 2 FAILED:', JSON.stringify(respError));
         } else {
-          console.log('[SUBMIT] Step 2 OK —', responseRows.length, 'responses saved');
+          console.log('[SUBMIT] Step 2 OK —', responseRows.length, 'responses');
         }
       } else {
-        console.log('[SUBMIT] Step 2 OK — no responses to save');
+        console.log('[SUBMIT] Step 2 OK — no responses');
       }
 
-      // 3. Upload vehicle photos (compressed) and insert records
+      // 3. Upload vehicle photos (compressed)
       const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
         ([, pd]) => pd.file != null
       );
-      console.log('[SUBMIT] Step 3: Uploading', photoEntries.length, 'vehicle photos…');
+      console.log('[SUBMIT] Step 3:', photoEntries.length, 'photos to upload');
       let photoIdx = 0;
 
       for (const [photoType, photoData] of photoEntries) {
         if (!photoData.file) continue;
         photoIdx++;
         setSubmitProgress(`Step 3/5: Photo ${photoIdx}/${photoEntries.length}…`);
-        console.log(`[SUBMIT] Step 3: Compressing ${photoType} (${(photoData.file.size / 1024).toFixed(0)}KB)…`);
 
         try {
-          // Compress image to JPEG, max 1920px, ~75% quality
           const compressed = await compressImage(photoData.file);
-          console.log(`[SUBMIT] Step 3: Uploading ${photoType} (${(compressed.size / 1024).toFixed(0)}KB)…`);
+          console.log(`[SUBMIT] Photo ${photoType}: ${(photoData.file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
 
-          const filePath = `${submission.id}/${photoType}.jpg`;
+          const filePath = `${submissionId}/${photoType}.jpg`;
           const { error: uploadError } = await supabase.storage
             .from('vehicle-photos')
-            .upload(filePath, compressed, {
-              contentType: 'image/jpeg',
-              upsert: false,
-            });
+            .upload(filePath, compressed, { contentType: 'image/jpeg', upsert: false });
 
           if (uploadError) {
-            console.error(`[SUBMIT] Step 3: Upload FAILED (${photoType}):`, uploadError);
+            console.error(`[SUBMIT] Photo upload FAILED (${photoType}):`, JSON.stringify(uploadError));
             continue;
           }
 
@@ -176,30 +173,28 @@ export function NewChecklistPage() {
             .from('vehicle-photos')
             .getPublicUrl(filePath);
 
-          const { error: photoRecordError } = await supabase
+          const { error: recErr } = await supabase
             .from('submission_photos')
             .insert({
-              submission_id: submission.id,
+              submission_id: submissionId,
               photo_type: photoType,
               storage_url: urlData.publicUrl,
             });
 
-          if (photoRecordError) {
-            console.error(`[SUBMIT] Step 3: Record FAILED (${photoType}):`, photoRecordError);
+          if (recErr) {
+            console.error(`[SUBMIT] Photo record FAILED (${photoType}):`, JSON.stringify(recErr));
           } else {
-            console.log(`[SUBMIT] Step 3: ${photoType} uploaded OK`);
+            console.log(`[SUBMIT] Photo ${photoType} OK`);
           }
         } catch (photoErr) {
-          console.error(`[SUBMIT] Step 3: Processing FAILED (${photoType}):`, photoErr);
+          console.error(`[SUBMIT] Photo exception (${photoType}):`, photoErr);
         }
       }
 
       // 4. Insert defects
       if (store.defects.length > 0) {
         setSubmitProgress('Step 4/5: Saving defects…');
-        console.log('[SUBMIT] Step 4: Inserting', store.defects.length, 'defects…');
-      } else {
-        console.log('[SUBMIT] Step 4: No defects to save');
+        console.log('[SUBMIT] Step 4:', store.defects.length, 'defects');
       }
 
       for (let i = 0; i < store.defects.length; i++) {
@@ -207,52 +202,48 @@ export function NewChecklistPage() {
         let defectImageUrl: string | null = null;
 
         if (defect.imageFile) {
-          setSubmitProgress(`Step 4/5: Defect photo ${i + 1}/${store.defects.length}…`);
-
+          setSubmitProgress(`Step 4/5: Defect photo ${i + 1}…`);
           try {
             const compressed = await compressImage(defect.imageFile);
-            const filePath = `${submission.id}/defect_${i + 1}.jpg`;
-            const { error: uploadError } = await supabase.storage
+            const filePath = `${submissionId}/defect_${i + 1}.jpg`;
+            const { error: upErr } = await supabase.storage
               .from('defect-photos')
-              .upload(filePath, compressed, {
-                contentType: 'image/jpeg',
-                upsert: false,
-              });
+              .upload(filePath, compressed, { contentType: 'image/jpeg', upsert: false });
 
-            if (!uploadError) {
+            if (!upErr) {
               const { data: urlData } = supabase.storage
                 .from('defect-photos')
                 .getPublicUrl(filePath);
               defectImageUrl = urlData.publicUrl;
             } else {
-              console.error(`[SUBMIT] Step 4: Defect photo upload FAILED (${i + 1}):`, uploadError);
+              console.error(`[SUBMIT] Defect photo FAILED (${i + 1}):`, JSON.stringify(upErr));
             }
-          } catch (defectPhotoErr) {
-            console.error(`[SUBMIT] Step 4: Defect photo processing FAILED (${i + 1}):`, defectPhotoErr);
+          } catch (dpErr) {
+            console.error(`[SUBMIT] Defect photo exception (${i + 1}):`, dpErr);
           }
         }
 
-        const { error: defectError } = await supabase.from('defects').insert({
-          submission_id: submission.id,
+        const { error: defErr } = await supabase.from('defects').insert({
+          submission_id: submissionId,
           defect_number: i + 1,
           image_url: defectImageUrl,
           details: defect.details,
         });
 
-        if (defectError) {
-          console.error(`[SUBMIT] Step 4: Defect insert FAILED (${i + 1}):`, defectError);
+        if (defErr) {
+          console.error(`[SUBMIT] Defect insert FAILED (${i + 1}):`, JSON.stringify(defErr));
         }
       }
 
-      // 5. Navigate to success
-      setSubmitProgress('Step 5/5: Complete!');
-      console.log('[SUBMIT] Step 5: All done — navigating home');
+      // 5. Done
+      setSubmitProgress('Complete!');
+      console.log('[SUBMIT] All done — navigating home');
       store.resetForm();
       navigate('/', { replace: true });
-    } catch (err) {
-      console.error('[SUBMIT] FATAL ERROR:', err);
-      const msg = err instanceof Error ? err.message : 'Submission failed';
-      setSubmitError(`Error: ${msg}. Check console for details.`);
+    } catch (err: unknown) {
+      console.error('[SUBMIT] FATAL:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setSubmitError(`Error: ${msg}`);
     } finally {
       setIsSubmitting(false);
       setSubmitProgress('');
