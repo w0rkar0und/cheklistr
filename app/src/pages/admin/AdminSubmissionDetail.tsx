@@ -66,7 +66,7 @@ export function AdminSubmissionDetail() {
           section_name: section?.name ?? '',
           checklist_items: undefined,
         };
-      }) as FullSubmission['responses'];
+      }) as unknown as FullSubmission['responses'];
 
       setSubmission({
         ...(sub as Submission),
