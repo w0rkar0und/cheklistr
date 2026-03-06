@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import type { Submission, SubmissionPhoto, ChecklistResponse, Defect } from '../../types/database';
@@ -15,6 +15,41 @@ export function AdminSubmissionDetail() {
   const [submission, setSubmission] = useState<FullSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Collect all viewable images (submission photos + defect photos) for lightbox
+  const allImages: { url: string; label: string }[] = [];
+  if (submission) {
+    submission.photos.forEach((p) =>
+      allImages.push({ url: p.storage_url, label: p.photo_type.replace(/_/g, ' ') })
+    );
+    submission.defects.forEach((d) => {
+      if (d.image_url)
+        allImages.push({ url: d.image_url, label: `Defect #${d.defect_number}` });
+    });
+  }
+
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  const prevImage = useCallback(() => {
+    setLightboxIndex((i) => (i !== null && i > 0 ? i - 1 : i));
+  }, []);
+  const nextImage = useCallback(() => {
+    setLightboxIndex((i) =>
+      i !== null && i < allImages.length - 1 ? i + 1 : i
+    );
+  }, [allImages.length]);
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowLeft') prevImage();
+      else if (e.key === 'ArrowRight') nextImage();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxIndex, closeLightbox, prevImage, nextImage]);
 
   useEffect(() => {
     const load = async () => {
@@ -207,16 +242,23 @@ export function AdminSubmissionDetail() {
         <section className="detail-section">
           <h3>Vehicle Photos ({submission.photos.length})</h3>
           <div className="photo-grid">
-            {submission.photos.map((photo) => (
-              <div key={photo.id} className="photo-card">
-                <img
-                  src={photo.storage_url}
-                  alt={photo.photo_type}
-                  loading="lazy"
-                />
-                <span className="photo-label">{photo.photo_type.replace(/_/g, ' ')}</span>
-              </div>
-            ))}
+            {submission.photos.map((photo) => {
+              const imgIdx = allImages.findIndex((img) => img.url === photo.storage_url);
+              return (
+                <div
+                  key={photo.id}
+                  className="photo-card photo-card--clickable"
+                  onClick={() => setLightboxIndex(imgIdx >= 0 ? imgIdx : 0)}
+                >
+                  <img
+                    src={photo.storage_url}
+                    alt={photo.photo_type}
+                    loading="lazy"
+                  />
+                  <span className="photo-label">{photo.photo_type.replace(/_/g, ' ')}</span>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
@@ -235,7 +277,11 @@ export function AdminSubmissionDetail() {
                     src={defect.image_url}
                     alt={`Defect ${defect.defect_number}`}
                     loading="lazy"
-                    className="defect-image"
+                    className="defect-image defect-image--clickable"
+                    onClick={() => {
+                      const idx = allImages.findIndex((img) => img.url === defect.image_url);
+                      if (idx >= 0) setLightboxIndex(idx);
+                    }}
                   />
                 )}
               </div>
@@ -249,6 +295,40 @@ export function AdminSubmissionDetail() {
           <h3>Defects</h3>
           <p className="empty-state">No defects reported</p>
         </section>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightboxIndex !== null && allImages[lightboxIndex] && (
+        <div className="lightbox-overlay" onClick={closeLightbox}>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button className="lightbox-close" onClick={closeLightbox} aria-label="Close">
+              &times;
+            </button>
+            {allImages.length > 1 && lightboxIndex > 0 && (
+              <button className="lightbox-nav lightbox-nav--prev" onClick={prevImage} aria-label="Previous">
+                &#8249;
+              </button>
+            )}
+            <img
+              src={allImages[lightboxIndex].url}
+              alt={allImages[lightboxIndex].label}
+              className="lightbox-image"
+            />
+            {allImages.length > 1 && lightboxIndex < allImages.length - 1 && (
+              <button className="lightbox-nav lightbox-nav--next" onClick={nextImage} aria-label="Next">
+                &#8250;
+              </button>
+            )}
+            <div className="lightbox-caption">
+              {allImages[lightboxIndex].label}
+              {allImages.length > 1 && (
+                <span className="lightbox-counter">
+                  {' '}({lightboxIndex + 1} / {allImages.length})
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
