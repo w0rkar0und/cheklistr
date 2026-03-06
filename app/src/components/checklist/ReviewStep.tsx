@@ -11,6 +11,7 @@ interface ReviewStepProps {
   tsFormStarted: string | null;
   tsFormReviewed: string | null;
   isSubmitting: boolean;
+  submitProgress?: string;
   onSubmit: () => void;
   onBack: () => void;
 }
@@ -25,6 +26,7 @@ export function ReviewStep({
   tsFormStarted,
   tsFormReviewed,
   isSubmitting,
+  submitProgress,
   onSubmit,
   onBack,
 }: ReviewStepProps) {
@@ -161,7 +163,7 @@ export function ReviewStep({
           onClick={onSubmit}
           disabled={isSubmitting}
         >
-          {isSubmitting ? 'Submitting...' : 'Submit Inspection'}
+          {isSubmitting ? (submitProgress || 'Submitting…') : 'Submit Inspection'}
         </button>
       </div>
     </div>

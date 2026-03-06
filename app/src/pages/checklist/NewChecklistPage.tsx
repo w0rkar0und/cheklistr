@@ -9,6 +9,7 @@ import { ChecklistSectionView } from '../../components/checklist/ChecklistSectio
 import { DefectsStep } from '../../components/checklist/DefectsStep';
 import { ReviewStep } from '../../components/checklist/ReviewStep';
 import { supabase } from '../../lib/supabase';
+import { compressImage } from '../../lib/imageCompressor';
 import type { ResponseValue } from '../../stores/checklistStore';
 
 const STEPS = ['vehicle-info', 'photos', 'checklist', 'defects', 'review'] as const;
@@ -19,6 +20,7 @@ export function NewChecklistPage() {
   const profile = useAuthStore((s) => s.profile);
   const appSession = useAuthStore((s) => s.appSession);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Load the active checklist on mount
@@ -73,6 +75,7 @@ export function NewChecklistPage() {
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setSubmitProgress('Creating submission record…');
 
     try {
       // 1. Create the submission record
@@ -105,6 +108,7 @@ export function NewChecklistPage() {
       }
 
       // 2. Insert checklist responses
+      setSubmitProgress('Saving checklist responses…');
       const responseRows = Array.from(store.responses.values())
         .filter((r) => hasValue(r))
         .map((r) => ({
@@ -125,72 +129,112 @@ export function NewChecklistPage() {
         }
       }
 
-      // 3. Upload vehicle photos and insert records
-      for (const [photoType, photoData] of store.vehiclePhotos.entries()) {
+      // 3. Upload vehicle photos (compressed) and insert records
+      const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
+        ([, pd]) => pd.file != null
+      );
+      let photoIdx = 0;
+
+      for (const [photoType, photoData] of photoEntries) {
         if (!photoData.file) continue;
+        photoIdx++;
+        setSubmitProgress(`Uploading photo ${photoIdx}/${photoEntries.length}…`);
 
-        const filePath = `${submission.id}/${photoType}.jpg`;
-        const { error: uploadError } = await supabase.storage
-          .from('vehicle-photos')
-          .upload(filePath, photoData.file, {
-            contentType: photoData.file.type,
-            upsert: false,
-          });
+        try {
+          // Compress image to JPEG, max 1920px, ~75% quality
+          const compressed = await compressImage(photoData.file);
 
-        if (uploadError) {
-          console.error(`Photo upload error (${photoType}):`, uploadError);
-          continue;
+          const filePath = `${submission.id}/${photoType}.jpg`;
+          const { error: uploadError } = await supabase.storage
+            .from('vehicle-photos')
+            .upload(filePath, compressed, {
+              contentType: 'image/jpeg',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error(`Photo upload error (${photoType}):`, uploadError);
+            continue;
+          }
+
+          const { data: urlData } = supabase.storage
+            .from('vehicle-photos')
+            .getPublicUrl(filePath);
+
+          const { error: photoRecordError } = await supabase
+            .from('submission_photos')
+            .insert({
+              submission_id: submission.id,
+              photo_type: photoType,
+              storage_url: urlData.publicUrl,
+            });
+
+          if (photoRecordError) {
+            console.error(`Photo record error (${photoType}):`, photoRecordError);
+          }
+        } catch (photoErr) {
+          console.error(`Photo processing error (${photoType}):`, photoErr);
+          // Continue with other photos — don't let one failure block everything
         }
-
-        const { data: urlData } = supabase.storage
-          .from('vehicle-photos')
-          .getPublicUrl(filePath);
-
-        await supabase.from('submission_photos').insert({
-          submission_id: submission.id,
-          photo_type: photoType,
-          storage_url: urlData.publicUrl,
-        });
       }
 
       // 4. Insert defects
+      if (store.defects.length > 0) {
+        setSubmitProgress('Saving defects…');
+      }
+
       for (let i = 0; i < store.defects.length; i++) {
         const defect = store.defects[i];
         let defectImageUrl: string | null = null;
 
         if (defect.imageFile) {
-          const filePath = `${submission.id}/defect_${i + 1}.jpg`;
-          const { error: uploadError } = await supabase.storage
-            .from('defect-photos')
-            .upload(filePath, defect.imageFile, {
-              contentType: defect.imageFile.type,
-              upsert: false,
-            });
+          setSubmitProgress(`Uploading defect photo ${i + 1}/${store.defects.length}…`);
 
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage
+          try {
+            const compressed = await compressImage(defect.imageFile);
+            const filePath = `${submission.id}/defect_${i + 1}.jpg`;
+            const { error: uploadError } = await supabase.storage
               .from('defect-photos')
-              .getPublicUrl(filePath);
-            defectImageUrl = urlData.publicUrl;
+              .upload(filePath, compressed, {
+                contentType: 'image/jpeg',
+                upsert: false,
+              });
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from('defect-photos')
+                .getPublicUrl(filePath);
+              defectImageUrl = urlData.publicUrl;
+            } else {
+              console.error(`Defect photo upload error (${i + 1}):`, uploadError);
+            }
+          } catch (defectPhotoErr) {
+            console.error(`Defect photo processing error (${i + 1}):`, defectPhotoErr);
           }
         }
 
-        await supabase.from('defects').insert({
+        const { error: defectError } = await supabase.from('defects').insert({
           submission_id: submission.id,
           defect_number: i + 1,
           image_url: defectImageUrl,
           details: defect.details,
         });
+
+        if (defectError) {
+          console.error(`Defect insert error (${i + 1}):`, defectError);
+        }
       }
 
       // 5. Navigate to success
+      setSubmitProgress('Done!');
       store.resetForm();
       navigate('/', { replace: true });
     } catch (err) {
       console.error('Submission error:', err);
-      setSubmitError(err instanceof Error ? err.message : 'Submission failed');
+      setSubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setSubmitProgress('');
     }
   };
 
@@ -309,6 +353,7 @@ export function NewChecklistPage() {
           tsFormStarted={store.tsFormStarted}
           tsFormReviewed={store.tsFormReviewed}
           isSubmitting={isSubmitting}
+          submitProgress={submitProgress}
           onSubmit={handleSubmit}
           onBack={() => goToStep('defects')}
         />
