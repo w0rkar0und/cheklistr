@@ -10,18 +10,16 @@ interface ImageFieldProps {
 
 /**
  * Image capture field for checklist items.
- * Uses the native file input with camera capture for mobile devices.
- * Full camera component integration will be added in the photo capture phase.
+ * Provides explicit Camera / Gallery buttons for reliable mobile behaviour.
  */
 export function ImageField({ item, value, onChange }: ImageFieldProps) {
   const config = (item.config ?? {}) as ImageConfig;
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Create a preview URL
     const previewUrl = URL.createObjectURL(file);
     onChange({ valueImageUrl: previewUrl });
     // TODO: Store the actual File object for upload
@@ -29,9 +27,8 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
 
   const handleRemove = () => {
     onChange({ valueImageUrl: null });
-    if (inputRef.current) {
-      inputRef.current.value = '';
-    }
+    if (cameraRef.current) cameraRef.current.value = '';
+    if (galleryRef.current) galleryRef.current.value = '';
   };
 
   return (
@@ -60,21 +57,27 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
           </button>
         </div>
       ) : (
-        <div className="image-capture-area">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleCapture}
-            className="image-input"
-            id={`field-${item.id}`}
-          />
-          <label htmlFor={`field-${item.id}`} className="image-capture-button">
-            <span className="image-capture-icon">&#128247;</span>
-            <span>Take Photo</span>
-          </label>
+        <div className="image-capture-buttons">
+          <button
+            type="button"
+            className="btn-secondary image-capture-btn"
+            onClick={() => { cameraRef.current!.value = ''; cameraRef.current!.click(); }}
+          >
+            &#128247; Camera
+          </button>
+          <button
+            type="button"
+            className="btn-secondary image-capture-btn"
+            onClick={() => { galleryRef.current!.value = ''; galleryRef.current!.click(); }}
+          >
+            &#128444; Gallery
+          </button>
         </div>
       )}
+
+      {/* Hidden file inputs */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="photo-slot-input" />
+      <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} className="photo-slot-input" />
     </div>
   );
 }

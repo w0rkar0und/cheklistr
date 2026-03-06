@@ -70,7 +70,7 @@ export function DefectsStep({
 }
 
 // ============================================================
-// Individual defect card
+// Individual defect card — camera/gallery choice
 // ============================================================
 
 interface DefectCardProps {
@@ -81,13 +81,19 @@ interface DefectCardProps {
 }
 
 function DefectCard({ defect, index, onUpdate, onRemove }: DefectCardProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
-  const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
     onUpdate({ imageFile: file, imageUrl: previewUrl });
+  };
+
+  const clearInputs = () => {
+    if (cameraRef.current) cameraRef.current.value = '';
+    if (galleryRef.current) galleryRef.current.value = '';
   };
 
   return (
@@ -121,27 +127,34 @@ function DefectCard({ defect, index, onUpdate, onRemove }: DefectCardProps) {
             className="image-remove-btn"
             onClick={() => {
               onUpdate({ imageFile: null, imageUrl: null });
-              if (inputRef.current) inputRef.current.value = '';
+              clearInputs();
             }}
           >
             Remove Photo
           </button>
         </div>
       ) : (
-        <div className="defect-image-capture">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageCapture}
-            id={`defect-image-${defect.id}`}
-            className="photo-slot-input"
-          />
-          <label htmlFor={`defect-image-${defect.id}`} className="btn-secondary" style={{ display: 'block', textAlign: 'center', cursor: 'pointer' }}>
-            &#128247; Add Photo
-          </label>
+        <div className="defect-image-buttons">
+          <button
+            type="button"
+            className="btn-secondary defect-photo-btn"
+            onClick={() => { cameraRef.current!.value = ''; cameraRef.current!.click(); }}
+          >
+            &#128247; Camera
+          </button>
+          <button
+            type="button"
+            className="btn-secondary defect-photo-btn"
+            onClick={() => { galleryRef.current!.value = ''; galleryRef.current!.click(); }}
+          >
+            &#128444; Gallery
+          </button>
         </div>
       )}
+
+      {/* Hidden file inputs */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="photo-slot-input" />
+      <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} className="photo-slot-input" />
     </div>
   );
 }

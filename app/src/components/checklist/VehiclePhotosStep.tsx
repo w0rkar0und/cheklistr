@@ -69,7 +69,7 @@ export function VehiclePhotosStep({
 }
 
 // ============================================================
-// Individual photo slot
+// Individual photo slot — two separate inputs for camera vs gallery
 // ============================================================
 
 interface PhotoSlotProps {
@@ -80,9 +80,10 @@ interface PhotoSlotProps {
 }
 
 function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
@@ -94,16 +95,21 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
       URL.revokeObjectURL(current.previewUrl);
     }
     onCapture(photoType, null, null);
-    if (inputRef.current) {
-      inputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+  };
+
+  const openCamera = () => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
     }
   };
 
-  const handleRetake = () => {
-    // Clear the input first so onChange fires even if same file is selected
-    if (inputRef.current) {
-      inputRef.current.value = '';
-      inputRef.current.click();
+  const openGallery = () => {
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = '';
+      galleryInputRef.current.click();
     }
   };
 
@@ -118,7 +124,7 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
             <button
               type="button"
               className="photo-slot-retake"
-              onClick={handleRetake}
+              onClick={openCamera}
               aria-label={`Retake ${label} photo`}
             >
               Retake
@@ -134,18 +140,34 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
           </div>
         </div>
       ) : (
-        <label className="photo-slot-capture" htmlFor={`photo-${photoType}`}>
-          <span className="photo-slot-icon">&#128247;</span>
+        <div className="photo-slot-empty">
           <span className="photo-slot-label">{label}</span>
-        </label>
+          <div className="photo-slot-buttons">
+            <button type="button" className="photo-slot-btn" onClick={openCamera}>
+              &#128247; Camera
+            </button>
+            <button type="button" className="photo-slot-btn photo-slot-btn--gallery" onClick={openGallery}>
+              &#128444; Gallery
+            </button>
+          </div>
+        </div>
       )}
-      {/* No capture attribute = mobile shows "Take Photo or Choose from Library" */}
+
+      {/* Camera input — capture="environment" forces rear camera */}
       <input
-        ref={inputRef}
-        id={`photo-${photoType}`}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
-        onChange={handleCapture}
+        capture="environment"
+        onChange={handleFile}
+        className="photo-slot-input"
+      />
+      {/* Gallery input — no capture attribute opens file/gallery picker */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFile}
         className="photo-slot-input"
       />
     </div>
