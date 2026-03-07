@@ -7,7 +7,7 @@ interface AuthState {
   authUser: SupabaseUser | null;
   // Application user profile
   profile: User | null;
-  // Current app session (with selfie tracking, 2-hour expiry)
+  // Current app session (2-hour expiry)
   appSession: Session | null;
   // Whether the app session has expired (triggers re-auth overlay)
   isSessionExpired: boolean;

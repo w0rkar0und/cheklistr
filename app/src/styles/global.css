@@ -1417,6 +1417,17 @@ button:disabled {
   gap: var(--space-sm);
 }
 
+.geo-link {
+  color: var(--color-primary, #2563EB);
+  text-decoration: none;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+}
+
+.geo-link:hover {
+  text-decoration: underline;
+}
+
 .defect-card {
   padding: var(--space-sm);
   background: #FEF2F2;

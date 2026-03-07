@@ -36,7 +36,6 @@ export interface User {
 export interface Session {
   id: string;
   user_id: string;
-  selfie_url: string | null;
   started_at: string;
   expires_at: string;
   terminated_at: string | null;
@@ -102,6 +101,8 @@ export interface Submission {
   ts_form_reviewed: string | null;
   ts_form_submitted: string | null;
   ts_synced: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
   updated_at: string;
 }

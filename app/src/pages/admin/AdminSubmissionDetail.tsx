@@ -198,6 +198,23 @@ export function AdminSubmissionDetail() {
             <span className="detail-label">Site</span>
             <span className="detail-value">{submission.site_code ?? '—'}</span>
           </div>
+          <div className="detail-field">
+            <span className="detail-label">Location</span>
+            <span className="detail-value">
+              {submission.latitude != null && submission.longitude != null ? (
+                <a
+                  href={`https://www.google.com/maps?q=${submission.latitude},${submission.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="geo-link"
+                >
+                  {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
+                </a>
+              ) : (
+                '—'
+              )}
+            </span>
+          </div>
         </div>
       </section>
 

@@ -123,7 +123,7 @@ export async function checkSessionValidity(sessionId: string): Promise<boolean> 
 
 /**
  * Extend the current app session by another 2 hours.
- * Called after successful re-authentication (selfie + password).
+ * Called after successful re-authentication.
  */
 export async function extendSession(sessionId: string): Promise<boolean> {
   const newExpiry = new Date(Date.now() + 2 * 60 * 60 * 1000);

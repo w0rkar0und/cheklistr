@@ -5,8 +5,8 @@ import { useAuthStore } from '../../stores/authStore';
 
 /**
  * Full-screen overlay that appears when the 2-hour app session expires.
- * The user must re-enter their password (and eventually provide a selfie)
- * to continue working. Drafts are preserved in IndexedDB regardless.
+ * The user must re-enter their password to continue working.
+ * Drafts are preserved in IndexedDB regardless.
  */
 export function SessionExpiryOverlay() {
   const [password, setPassword] = useState('');

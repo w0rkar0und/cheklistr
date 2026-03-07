@@ -96,6 +96,34 @@ export function NewChecklistPage() {
       }
       console.log('[SUBMIT] Auth OK — token length:', accessToken.length);
 
+      // ── Geolocation: capture GPS coordinates (mandatory) ──
+      setSubmitProgress('Getting location…');
+      console.log('[SUBMIT] Requesting geolocation…');
+      let geoLatitude: number | null = null;
+      let geoLongitude: number | null = null;
+
+      try {
+        const position = await withTimeout(
+          new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 15000,
+              maximumAge: 60000,
+            });
+          }),
+          20000,
+          'Geolocation'
+        );
+        geoLatitude = position.coords.latitude;
+        geoLongitude = position.coords.longitude;
+        console.log('[SUBMIT] Geolocation OK:', geoLatitude, geoLongitude);
+      } catch (geoErr) {
+        console.error('[SUBMIT] Geolocation failed:', geoErr);
+        throw new Error(
+          'Location access is required to submit the checklist. Please enable location services in your browser settings and try again.'
+        );
+      }
+
       // ── Step 1: Insert submission via raw fetch (bypasses Supabase JS client) ──
       setSubmitProgress('Step 1/5: Creating submission…');
       const submissionId = crypto.randomUUID();
@@ -120,6 +148,8 @@ export function NewChecklistPage() {
         ts_form_started: store.tsFormStarted,
         ts_form_reviewed: store.tsFormReviewed,
         ts_form_submitted: new Date().toISOString(),
+        latitude: geoLatitude,
+        longitude: geoLongitude,
       };
 
       console.log('[SUBMIT] Step 1: raw POST to', `${SUPABASE_URL}/rest/v1/submissions`);
