@@ -68,9 +68,17 @@ export function useAuth() {
         try {
           const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-              if (useAuthStore.getState().suppressAuthEvents) {
+              const state = useAuthStore.getState();
+
+              // Skip events when suppressed (during admin user creation)
+              if (state.suppressAuthEvents) {
+                console.log('[AUTH] Event suppressed:', event);
                 return;
               }
+
+              // NEVER set isLoading back to true from the listener.
+              // The initial load is the only time isLoading should be true.
+              // This prevents race conditions from leaving the UI stuck.
 
               if (event === 'SIGNED_IN' && session?.user) {
                 store.setAuthUser(session.user);
@@ -81,6 +89,9 @@ export function useAuth() {
               } else if (event === 'SIGNED_OUT') {
                 stopSessionChecks();
                 store.reset();
+              } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+                // Token refresh — update auth user but don't touch loading
+                store.setAuthUser(session.user);
               }
             }
           );

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
+import { getAccessTokenFromStorage } from '../../lib/supabase';
 import { toSyntheticEmail } from '../../lib/auth';
 import { useAuthStore } from '../../stores/authStore';
 import type { User, UserRole } from '../../types/database';
@@ -65,8 +66,16 @@ export function AdminUsers() {
       const adminId = useAuthStore.getState().profile?.id;
       if (!adminId) throw new Error('Admin session not found');
 
-      const { data: { session: adminSession } } = await supabase.auth.getSession();
-      if (!adminSession) throw new Error('Admin auth session not found');
+      // Read session from localStorage — avoids supabase.auth.getSession() which hangs
+      const url = import.meta.env.VITE_SUPABASE_URL as string;
+      const projectRef = new URL(url).hostname.split('.')[0];
+      const storageKey = `sb-${projectRef}-auth-token`;
+      const rawSession = localStorage.getItem(storageKey);
+      if (!rawSession) throw new Error('Admin auth session not found in localStorage');
+      const adminSession = JSON.parse(rawSession);
+      if (!adminSession?.access_token || !adminSession?.refresh_token) {
+        throw new Error('Admin auth session is incomplete');
+      }
 
       // 1. Suppress auth state listener — signUp() and setSession()
       //    fire rapid SIGNED_IN events that would blow out the admin profile
@@ -91,7 +100,9 @@ export function AdminUsers() {
         refresh_token: adminSession.refresh_token,
       });
 
-      // 4. Re-enable auth listener now that admin session is restored
+      // 4. Delay before re-enabling auth listener to let any queued
+      //    auth state events from setSession() flush through first
+      await new Promise((resolve) => setTimeout(resolve, 500));
       useAuthStore.getState().setSuppressAuthEvents(false);
 
       // 5. Insert into users table via SECURITY DEFINER function
