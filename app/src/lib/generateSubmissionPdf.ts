@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { FullSubmission, SubmissionPhoto, Defect } from '../types/database';
+import type { FullSubmission, SubmissionPhoto } from '../types/database';
 
 // Extended response type with joined labels
 interface ResponseWithLabels {
@@ -202,7 +202,8 @@ export async function generateSubmissionPdf(
           0: { cellWidth: contentWidth * 0.7 },
           1: { cellWidth: contentWidth * 0.3, halign: 'center' },
         },
-        didParseCell: (data: { section: string; column: { index: number }; row: { index: number }; cell: { styles: { textColor: number[] } } }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        didParseCell: (data: any) => {
           // Highlight fail values in red
           if (data.section === 'body' && data.column.index === 1) {
             const rowData = responseRows[data.row.index];
