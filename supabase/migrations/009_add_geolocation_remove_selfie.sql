@@ -22,11 +22,12 @@ ALTER TABLE public.sessions
   DROP COLUMN IF EXISTS selfie_url;
 
 -- ============================================
--- 3. Remove selfie-captures storage bucket
---    (drop policies first, then bucket)
+-- 3. Remove selfie-captures storage policies
+--    (bucket must be deleted manually via Supabase Dashboard > Storage)
 -- ============================================
 DROP POLICY IF EXISTS "Users can upload selfies" ON storage.objects;
 DROP POLICY IF EXISTS "Users can view own selfies" ON storage.objects;
 DROP POLICY IF EXISTS "Admins can view all selfies" ON storage.objects;
 
-DELETE FROM storage.buckets WHERE id = 'selfie-captures';
+-- NOTE: Delete the 'selfie-captures' bucket manually in
+-- Supabase Dashboard > Storage > selfie-captures > Delete bucket
