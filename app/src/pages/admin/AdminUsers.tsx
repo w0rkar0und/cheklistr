@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
-import { getAccessTokenFromStorage } from '../../lib/supabase';
 import { toSyntheticEmail } from '../../lib/auth';
 import { useAuthStore } from '../../stores/authStore';
 import type { User, UserRole } from '../../types/database';
