@@ -1652,3 +1652,9 @@ button:disabled {
 .btn-ghost:hover {
   background: rgba(255, 255, 255, 0.1);
 }
+
+.pwa-ios-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 2px;
+}
