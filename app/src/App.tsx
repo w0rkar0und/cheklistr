@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useAuthStore } from './stores/authStore';
 import { SessionExpiryOverlay } from './components/common/SessionExpiryOverlay';
+import { PwaInstallBanner } from './components/common/PwaInstallBanner';
 import { router } from './router';
 import './styles/global.css';
 
@@ -22,6 +23,7 @@ function App() {
   return (
     <>
       <RouterProvider router={router} />
+      <PwaInstallBanner />
       {isSessionExpired && <SessionExpiryOverlay />}
     </>
   );
