@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { generateSubmissionPdf } from '../../lib/generateSubmissionPdf';
 import type { Submission, SubmissionPhoto, ChecklistResponse, Defect } from '../../types/database';
 
 interface FullSubmission extends Submission {
@@ -16,6 +17,26 @@ export function AdminSubmissionDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState('');
+
+  const handleDownloadPdf = async () => {
+    if (!submission) return;
+    setPdfGenerating(true);
+    setPdfProgress('Preparing PDF…');
+    try {
+      await generateSubmissionPdf(
+        submission as Parameters<typeof generateSubmissionPdf>[0],
+        (msg) => setPdfProgress(msg)
+      );
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setPdfGenerating(false);
+      setPdfProgress('');
+    }
+  };
 
   // Collect all viewable images (submission photos + defect photos) for lightbox
   const allImages: { url: string; label: string }[] = submission
@@ -161,10 +182,19 @@ export function AdminSubmissionDetail() {
 
       {/* Header */}
       <div className="detail-header">
-        <h2>{submission.vehicle_registration}</h2>
-        <span className={`status-badge status-badge--${submission.status}`}>
-          {submission.status}
-        </span>
+        <div className="detail-header-left">
+          <h2>{submission.vehicle_registration}</h2>
+          <span className={`status-badge status-badge--${submission.status}`}>
+            {submission.status}
+          </span>
+        </div>
+        <button
+          className="btn-primary btn-pdf"
+          onClick={handleDownloadPdf}
+          disabled={pdfGenerating}
+        >
+          {pdfGenerating ? pdfProgress : 'Download PDF'}
+        </button>
       </div>
 
       {/* Vehicle & Driver Info */}

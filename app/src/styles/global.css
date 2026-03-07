@@ -1292,11 +1292,29 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-lg);
+  gap: var(--space-sm);
+}
+
+.detail-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 .detail-header h2 {
   font-family: var(--font-mono, monospace);
   font-size: 1.5rem;
+}
+
+.btn-pdf {
+  white-space: nowrap;
+  font-size: 0.85rem;
+  padding: 8px 16px;
+}
+
+.btn-pdf:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 
 .detail-section {
