@@ -56,9 +56,17 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 /**
  * Generate a PDF report for a submission and trigger browser download.
  */
+export interface SubmitterDetails {
+  full_name: string;
+  login_id: string;
+  email: string | null;
+  contractor_id: string | null;
+}
+
 export async function generateSubmissionPdf(
   submission: FullSubmission & { responses: ResponseWithLabels[] },
-  onProgress?: (msg: string) => void
+  onProgress?: (msg: string) => void,
+  submitter?: SubmitterDetails | null
 ): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -129,14 +137,17 @@ export async function generateSubmissionPdf(
 
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
 
-  // ── Timeline ──
+  // ── Submission Audit Details ──
   checkPage(30);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Timeline', margin, y + 4);
+  doc.text('Submission Audit Details', margin, y + 4);
   y += 8;
 
-  const timeRows = [
+  const auditRows = [
+    ['Submitted By', submitter?.full_name ?? '—'],
+    ['Login ID', submitter?.login_id ?? '—'],
+    ['Email', submitter?.email ?? '—'],
     ['Form Started', formatDate(submission.ts_form_started)],
     ['Form Reviewed', formatDate(submission.ts_form_reviewed)],
     ['Form Submitted', formatDate(submission.ts_form_submitted)],
@@ -145,7 +156,7 @@ export async function generateSubmissionPdf(
   autoTable(doc, {
     startY: y,
     head: [],
-    body: timeRows,
+    body: auditRows,
     theme: 'plain',
     margin: { left: margin, right: margin },
     styles: { fontSize: 9, cellPadding: 2 },

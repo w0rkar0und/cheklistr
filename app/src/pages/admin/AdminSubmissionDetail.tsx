@@ -10,10 +10,18 @@ interface FullSubmission extends Submission {
   defects: Defect[];
 }
 
+interface SubmitterInfo {
+  full_name: string;
+  login_id: string;
+  email: string | null;
+  contractor_id: string | null;
+}
+
 export function AdminSubmissionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [submission, setSubmission] = useState<FullSubmission | null>(null);
+  const [submitter, setSubmitter] = useState<SubmitterInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -27,7 +35,8 @@ export function AdminSubmissionDetail() {
     try {
       await generateSubmissionPdf(
         submission as Parameters<typeof generateSubmissionPdf>[0],
-        (msg) => setPdfProgress(msg)
+        (msg) => setPdfProgress(msg),
+        submitter
       );
     } catch (err) {
       console.error('PDF generation failed:', err);
@@ -115,6 +124,17 @@ export function AdminSubmissionDetail() {
         .select('*')
         .eq('submission_id', id)
         .order('defect_number');
+
+      // Fetch submitter profile
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('full_name, login_id, email, contractor_id')
+        .eq('id', (sub as Submission).user_id)
+        .single();
+
+      if (userProfile) {
+        setSubmitter(userProfile as SubmitterInfo);
+      }
 
       // Flatten the response joins
       const flatResponses = (responses ?? []).map((r: Record<string, unknown>) => {
@@ -248,10 +268,22 @@ export function AdminSubmissionDetail() {
         </div>
       </section>
 
-      {/* Timestamps */}
+      {/* Submission Audit Details */}
       <section className="detail-section">
-        <h3>Timeline</h3>
+        <h3>Submission Audit Details</h3>
         <div className="detail-grid">
+          <div className="detail-field">
+            <span className="detail-label">Submitted By</span>
+            <span className="detail-value">{submitter?.full_name ?? '—'}</span>
+          </div>
+          <div className="detail-field">
+            <span className="detail-label">Login ID</span>
+            <span className="detail-value">{submitter?.login_id ?? '—'}</span>
+          </div>
+          <div className="detail-field">
+            <span className="detail-label">Email</span>
+            <span className="detail-value">{submitter?.email ?? '—'}</span>
+          </div>
           <div className="detail-field">
             <span className="detail-label">Form Started</span>
             <span className="detail-value">{formatDate(submission.ts_form_started)}</span>
