@@ -41,9 +41,9 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
       } catch (err) {
         console.warn('Camera capture cancelled or failed:', err);
       }
-    } else {
-      cameraRef.current!.value = '';
-      cameraRef.current!.click();
+    } else if (cameraRef.current) {
+      cameraRef.current.value = '';
+      cameraRef.current.click();
     }
   };
 
@@ -55,9 +55,9 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
       } catch (err) {
         console.warn('Gallery pick cancelled or failed:', err);
       }
-    } else {
-      galleryRef.current!.value = '';
-      galleryRef.current!.click();
+    } else if (galleryRef.current) {
+      galleryRef.current.value = '';
+      galleryRef.current.click();
     }
   };
 
@@ -105,13 +105,9 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
         </div>
       )}
 
-      {/* Web-only hidden file inputs */}
-      {!isNativePlatform() && (
-        <>
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="photo-slot-input" />
-          <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} className="photo-slot-input" />
-        </>
-      )}
+      {/* Hidden file inputs — always rendered so refs are never null on web */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
+      <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
     </div>
   );
 }

@@ -173,26 +173,24 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
         </div>
       )}
 
-      {/* Web-only hidden file inputs — not used on native */}
-      {!isNativePlatform() && (
-        <>
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFile}
-            className="photo-slot-input"
-          />
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFile}
-            className="photo-slot-input"
-          />
-        </>
-      )}
+      {/* Hidden file inputs — always rendered so refs are never null on web */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFile}
+        className="photo-slot-input"
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFile}
+        className="photo-slot-input"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }
