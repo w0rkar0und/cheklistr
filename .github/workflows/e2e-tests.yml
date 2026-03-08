@@ -2,17 +2,31 @@ name: E2E Tests
 
 # ─── When to run ───────────────────────────────────────────────
 on:
-  # On every push to main
+  # On push to main — only when app source code changes
   push:
     branches: [main]
+    paths:
+      - 'app/src/**'
+      - 'app/public/**'
+      - 'app/index.html'
+      - 'app/vite.config.*'
+      - 'app/package.json'
+      - 'app/vercel.json'
 
-  # On pull requests targeting main
+  # On PRs targeting main — only when app source code changes
   pull_request:
     branches: [main]
+    paths:
+      - 'app/src/**'
+      - 'app/public/**'
+      - 'app/index.html'
+      - 'app/vite.config.*'
+      - 'app/package.json'
+      - 'app/vercel.json'
 
-  # Daily at 07:00 UTC (approx 07:00 GMT / 08:00 BST)
+  # Every 2 hours from 08:00–22:00 UTC (approx 08:00–22:00 GMT / 09:00–23:00 BST)
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 8,10,12,14,16,18,20,22 * * *'
 
   # Manual trigger from GitHub Actions UI
   workflow_dispatch:
