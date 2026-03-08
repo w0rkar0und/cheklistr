@@ -19,9 +19,17 @@ setup('authenticate as test user', async ({ page }) => {
     );
   }
 
-  // Navigate to login page
-  await page.goto('/login');
-  await expect(page.locator('h1')).toContainText('Cheklistr');
+  // Navigate to login page and wait for React to fully hydrate
+  await page.goto('/login', { waitUntil: 'networkidle' });
+
+  // Debug: log what the page actually rendered (visible in CI logs on failure)
+  const pageTitle = await page.title();
+  const bodyText = await page.locator('body').innerText().catch(() => '(empty)');
+  console.log(`[auth-setup] Page title: "${pageTitle}"`);
+  console.log(`[auth-setup] Body text preview: "${bodyText.substring(0, 200)}"`);
+
+  // Wait for the React app to mount — the login form input is a reliable marker
+  await expect(page.locator('#login-id')).toBeVisible({ timeout: 15_000 });
 
   // Fill login form
   await page.fill('#login-id', userId);
@@ -32,7 +40,9 @@ setup('authenticate as test user', async ({ page }) => {
   await expect(page).toHaveURL('/', { timeout: 15_000 });
 
   // Confirm we landed on the home page (greeting visible)
-  await expect(page.locator('.home-greeting h2')).toContainText('Welcome');
+  await expect(page.locator('.home-greeting h2')).toContainText('Welcome', {
+    timeout: 10_000,
+  });
 
   // Ensure auth directory exists and save state
   fs.mkdirSync(authDir, { recursive: true });
