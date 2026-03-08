@@ -264,6 +264,9 @@ export function AdminChecklists() {
     setLoading(true);
     try {
       // Manual cascade: items → sections → version
+      // Using .select() on each delete to verify rows were actually affected
+      // (Supabase RLS silently returns 200 with 0 rows if policy blocks the delete)
+
       // 1. Get section IDs for this version
       const { data: sections } = await supabase
         .from('checklist_sections')
@@ -274,26 +277,36 @@ export function AdminChecklists() {
         const sectionIds = sections.map((s: { id: string }) => s.id);
 
         // 2. Delete all items in those sections
-        const { error: itemsErr } = await supabase
+        const { data: deletedItems, error: itemsErr } = await supabase
           .from('checklist_items')
           .delete()
-          .in('section_id', sectionIds);
+          .in('section_id', sectionIds)
+          .select();
         if (itemsErr) throw itemsErr;
+        // Items may legitimately be 0 if sections were empty, so no count check here
 
         // 3. Delete all sections for this version
-        const { error: sectionsErr } = await supabase
+        const { data: deletedSections, error: sectionsErr } = await supabase
           .from('checklist_sections')
           .delete()
-          .eq('checklist_version_id', version.id);
+          .eq('checklist_version_id', version.id)
+          .select();
         if (sectionsErr) throw sectionsErr;
+        if (!deletedSections || deletedSections.length === 0) {
+          throw new Error('Failed to delete sections — check RLS policies');
+        }
       }
 
       // 4. Delete the version itself
-      const { error: versionErr } = await supabase
+      const { data: deletedVersion, error: versionErr } = await supabase
         .from('checklist_versions')
         .delete()
-        .eq('id', version.id);
+        .eq('id', version.id)
+        .select();
       if (versionErr) throw versionErr;
+      if (!deletedVersion || deletedVersion.length === 0) {
+        throw new Error('Failed to delete version — check RLS policies');
+      }
 
       await loadVersions();
     } catch (err) {
