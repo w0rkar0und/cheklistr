@@ -1,6 +1,8 @@
 import { useRef } from 'react';
 import type { ChecklistItem, ImageConfig } from '../../../types/database';
 import type { ResponseValue } from '../../../stores/checklistStore';
+import { isNativePlatform } from '../../../lib/capacitorPlatform';
+import { capturePhoto, pickPhoto } from '../../../lib/nativeCamera';
 
 interface ImageFieldProps {
   item: ChecklistItem;
@@ -10,7 +12,8 @@ interface ImageFieldProps {
 
 /**
  * Image capture field for checklist items.
- * Provides explicit Camera / Gallery buttons for reliable mobile behaviour.
+ * On native: uses Capacitor camera plugin.
+ * On web: provides explicit Camera / Gallery buttons with hidden file inputs.
  */
 export function ImageField({ item, value, onChange }: ImageFieldProps) {
   const config = (item.config ?? {}) as ImageConfig;
@@ -22,13 +25,40 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
     onChange({ valueImageUrl: previewUrl });
-    // TODO: Store the actual File object for upload
   };
 
   const handleRemove = () => {
     onChange({ valueImageUrl: null });
     if (cameraRef.current) cameraRef.current.value = '';
     if (galleryRef.current) galleryRef.current.value = '';
+  };
+
+  const handleCamera = async () => {
+    if (isNativePlatform()) {
+      try {
+        const result = await capturePhoto('rear');
+        onChange({ valueImageUrl: result.previewUrl });
+      } catch (err) {
+        console.warn('Camera capture cancelled or failed:', err);
+      }
+    } else {
+      cameraRef.current!.value = '';
+      cameraRef.current!.click();
+    }
+  };
+
+  const handleGallery = async () => {
+    if (isNativePlatform()) {
+      try {
+        const result = await pickPhoto();
+        onChange({ valueImageUrl: result.previewUrl });
+      } catch (err) {
+        console.warn('Gallery pick cancelled or failed:', err);
+      }
+    } else {
+      galleryRef.current!.value = '';
+      galleryRef.current!.click();
+    }
   };
 
   return (
@@ -61,23 +91,27 @@ export function ImageField({ item, value, onChange }: ImageFieldProps) {
           <button
             type="button"
             className="btn-secondary image-capture-btn"
-            onClick={() => { cameraRef.current!.value = ''; cameraRef.current!.click(); }}
+            onClick={handleCamera}
           >
             &#128247; Camera
           </button>
           <button
             type="button"
             className="btn-secondary image-capture-btn"
-            onClick={() => { galleryRef.current!.value = ''; galleryRef.current!.click(); }}
+            onClick={handleGallery}
           >
             &#128444; Gallery
           </button>
         </div>
       )}
 
-      {/* Hidden file inputs */}
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="photo-slot-input" />
-      <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} className="photo-slot-input" />
+      {/* Web-only hidden file inputs */}
+      {!isNativePlatform() && (
+        <>
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="photo-slot-input" />
+          <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} className="photo-slot-input" />
+        </>
+      )}
     </div>
   );
 }

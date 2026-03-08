@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
 import type { User, Session as AppSession } from '../types/database';
+import { isNativePlatform } from './capacitorPlatform';
+import { saveAuthTokens, getAuthTokens, clearAuthTokens } from './secureStorage';
 
 // ============================================================
 // Auth Service — stateless functions for authentication
@@ -27,6 +29,12 @@ export async function signIn(loginId: string, password: string) {
     email,
     password,
   });
+
+  // On native: persist tokens to secure storage for biometric unlock
+  if (!error && data.session && isNativePlatform()) {
+    await saveAuthTokens(data.session.access_token, data.session.refresh_token);
+  }
+
   return { data, error };
 }
 
@@ -45,8 +53,45 @@ export async function signOut(appSessionId?: string) {
       .eq('id', appSessionId);
   }
 
+  // Clear secure storage tokens on native
+  if (isNativePlatform()) {
+    await clearAuthTokens();
+  }
+
   const { error } = await supabase.auth.signOut();
   return { error };
+}
+
+/**
+ * Attempt to restore a Supabase session from securely stored tokens.
+ * Used after biometric unlock on native to resume without credentials.
+ */
+export async function restoreSessionFromTokens(): Promise<{
+  success: boolean;
+  userId?: string;
+}> {
+  const { accessToken, refreshToken } = await getAuthTokens();
+
+  if (!refreshToken) {
+    return { success: false };
+  }
+
+  // Use the refresh token to get a new session
+  const { data, error } = await supabase.auth.setSession({
+    access_token: accessToken ?? '',
+    refresh_token: refreshToken,
+  });
+
+  if (error || !data.session) {
+    // Token expired or invalid — clear stored tokens
+    await clearAuthTokens();
+    return { success: false };
+  }
+
+  // Update stored tokens with the refreshed ones
+  await saveAuthTokens(data.session.access_token, data.session.refresh_token);
+
+  return { success: true, userId: data.session.user.id };
 }
 
 /**

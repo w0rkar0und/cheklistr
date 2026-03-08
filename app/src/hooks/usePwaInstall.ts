@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { isNativePlatform } from '../lib/capacitorPlatform';
 
 const DISMISSED_KEY = 'cheklistr-pwa-install-dismissed';
 
@@ -75,7 +76,8 @@ export function usePwaInstall() {
   }, []);
 
   // Show banner if: (has deferred prompt OR is iOS) AND not installed AND not dismissed
-  const canPrompt = (!!deferredPrompt || isIos) && !isInstalled && !isDismissed;
+  // Never show on native — the app is already installed via Capacitor
+  const canPrompt = !isNativePlatform() && (!!deferredPrompt || isIos) && !isInstalled && !isDismissed;
 
   return { canPrompt, isInstalled, isIos, promptInstall, dismiss };
 }

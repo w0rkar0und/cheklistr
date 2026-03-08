@@ -12,6 +12,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../.
 import { compressImage } from '../../lib/imageCompressor';
 import { savePendingSubmission, getPendingCount } from '../../lib/offlineDb';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { getCurrentLocation } from '../../lib/nativeGeolocation';
 import type { ResponseValue } from '../../stores/checklistStore';
 import type { PendingPhoto, PendingDefect, PendingResponse } from '../../lib/offlineDb';
 
@@ -138,24 +139,14 @@ export function NewChecklistPage() {
       let geoLongitude: number | null = null;
 
       try {
-        const position = await withTimeout(
-          new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 15000,
-              maximumAge: 60000,
-            });
-          }),
-          20000,
-          'Geolocation'
-        );
-        geoLatitude = position.coords.latitude;
-        geoLongitude = position.coords.longitude;
+        const coords = await getCurrentLocation();
+        geoLatitude = coords.latitude;
+        geoLongitude = coords.longitude;
         console.log('[SUBMIT] Geolocation OK:', geoLatitude, geoLongitude);
       } catch (geoErr) {
         console.error('[SUBMIT] Geolocation failed:', geoErr);
         throw new Error(
-          'Location access is required to submit the checklist. Please enable location services in your browser settings and try again.'
+          'Location access is required to submit the checklist. Please enable location services and try again.'
         );
       }
 
@@ -445,19 +436,9 @@ export function NewChecklistPage() {
     let geoLatitude = 0;
     let geoLongitude = 0;
     try {
-      const position = await withTimeout(
-        new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 60000,
-          });
-        }),
-        20000,
-        'Geolocation'
-      );
-      geoLatitude = position.coords.latitude;
-      geoLongitude = position.coords.longitude;
+      const coords = await getCurrentLocation();
+      geoLatitude = coords.latitude;
+      geoLongitude = coords.longitude;
     } catch {
       // GPS optional for offline — can't block the save
       console.warn('[SUBMIT] GPS unavailable for offline save');
