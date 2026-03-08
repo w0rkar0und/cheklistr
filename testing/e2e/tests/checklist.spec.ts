@@ -1,4 +1,21 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
+import fs from 'fs';
+
+// Create a minimal 1x1 PNG test image for photo uploads
+const TEST_IMAGE_DIR = path.join(__dirname, '..', 'test-results', 'fixtures');
+const TEST_IMAGE_PATH = path.join(TEST_IMAGE_DIR, 'test-photo.png');
+
+// 1x1 red PNG (68 bytes)
+const TINY_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+test.beforeAll(() => {
+  fs.mkdirSync(TEST_IMAGE_DIR, { recursive: true });
+  fs.writeFileSync(TEST_IMAGE_PATH, TINY_PNG);
+});
 
 test.describe('New Checklist — Vehicle Info Step', () => {
   test.beforeEach(async ({ page }) => {
@@ -78,11 +95,26 @@ test.describe('New Checklist — Multi-Step Navigation', () => {
     await page.fill('#colour', 'Blue');
     await page.click('button:has-text("Continue to Photos")');
 
-    // Step 2: Photos — progress shows step 2, click Continue to Checklist
+    // Step 2: Photos — upload a test image to all 10 required photo slots
     await expect(page.locator('.form-progress-label')).toContainText('Step 2 of 5', {
       timeout: 5_000,
     });
-    await page.click('button:has-text("Continue to Checklist")');
+
+    // Each photo slot has two hidden file inputs (camera + gallery).
+    // We target the gallery input (second input) in each .photo-slot.
+    const photoSlots = page.locator('.photo-slot');
+    const slotCount = await photoSlots.count();
+
+    for (let i = 0; i < slotCount; i++) {
+      // Each slot has two <input type="file"> elements; use the second (gallery)
+      const fileInput = photoSlots.nth(i).locator('input[type="file"]').last();
+      await fileInput.setInputFiles(TEST_IMAGE_PATH);
+    }
+
+    // All photos uploaded — button should now be enabled
+    const continueBtn = page.locator('button:has-text("Continue to Checklist")');
+    await expect(continueBtn).toBeEnabled({ timeout: 5_000 });
+    await continueBtn.click();
 
     // Step 3: Checklist responses
     await expect(page.locator('.form-progress-label')).toContainText('Step 3 of 5', {
