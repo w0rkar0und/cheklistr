@@ -70,7 +70,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: adminAuthStatePath,
       },
-      testMatch: /admin\.spec\.ts/,
+      testMatch: /admin(-\w+)?\.spec\.ts/,
       dependencies: ['admin-auth-setup'],
     },
 

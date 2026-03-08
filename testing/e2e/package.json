@@ -13,6 +13,7 @@
     "test:checklist": "npx playwright test tests/checklist.spec.ts",
     "test:admin": "npx playwright test tests/admin.spec.ts",
     "test:submission": "npx playwright test tests/submission.spec.ts",
+    "test:admin:checklists": "npx playwright test tests/admin-checklists.spec.ts",
     "test:api": "npx playwright test --project=api",
     "test:api:auth": "npx playwright test tests/api-auth.spec.ts",
     "test:api:rls": "npx playwright test tests/api-rls.spec.ts",
