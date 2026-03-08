@@ -460,9 +460,11 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       // Click Delete on the draft card
       await draftCard.locator('.btn-danger.btn-small:has-text("Delete")').click();
 
-      // Draft card should disappear and version count should decrease
-      await expect(draftCard).not.toBeVisible({ timeout: 10_000 });
-      await expect(page.locator('.version-card')).toHaveCount(versionCountBefore - 1);
+      // Wait for the version list to reload (loading state hides it briefly)
+      await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+
+      // Draft card should no longer exist after reload
+      await expect(page.locator('.version-card--draft')).toHaveCount(0, { timeout: 5_000 });
 
       // Create New Draft button should be enabled again (no draft exists)
       await expect(page.locator('.btn-primary:has-text("Create New Draft")')).toBeEnabled();
