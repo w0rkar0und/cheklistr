@@ -156,16 +156,16 @@ test.describe('Admin Checklist Management — View Active Version', () => {
     const firstSection = page.locator('.section-editor').first();
     const toggleBtn = firstSection.locator('.section-expand-btn');
 
-    // Should start expanded — items visible
-    await expect(firstSection.locator('.section-items')).toBeVisible();
-
-    // Collapse
-    await toggleBtn.click();
+    // Sections start collapsed — items NOT visible
     await expect(firstSection.locator('.section-items')).not.toBeVisible();
 
-    // Expand again
+    // Expand
     await toggleBtn.click();
     await expect(firstSection.locator('.section-items')).toBeVisible();
+
+    // Collapse again
+    await toggleBtn.click();
+    await expect(firstSection.locator('.section-items')).not.toBeVisible();
   });
 
   test('items show labels and field type badges', async ({ page }) => {
@@ -176,6 +176,11 @@ test.describe('Admin Checklist Management — View Active Version', () => {
     await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
 
     await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
+
+    // Sections start collapsed — expand the first section
+    const firstSection = page.locator('.section-editor').first();
+    await firstSection.locator('.section-expand-btn').click();
+    await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
     const firstItem = page.locator('.item-row').first();
     await expect(firstItem.locator('.item-label')).toBeVisible();
@@ -190,6 +195,16 @@ test.describe('Admin Checklist Management — View Active Version', () => {
     await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
 
     await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
+
+    // Sections start collapsed — expand all sections to find required badges
+    const sections = page.locator('.section-editor');
+    const count = await sections.count();
+    for (let i = 0; i < count; i++) {
+      await sections.nth(i).locator('.section-expand-btn').click();
+    }
+
+    // Wait for items to appear
+    await expect(page.locator('.item-row').first()).toBeVisible({ timeout: 5_000 });
 
     // At least some items should have the Required badge
     const requiredBadges = page.locator('.item-badge--required');
@@ -278,9 +293,14 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await expect(page.locator('.editor-top-bar')).toBeVisible({ timeout: 10_000 });
       await expect(page.locator('.version-badge--draft')).toBeVisible();
 
-      // Edit mode should show Add Section and Add Item buttons
+      // Edit mode should show Add Section button
       await expect(page.locator('button:has-text("+ Add Section")')).toBeVisible();
-      await expect(page.locator('.btn-add-item').first()).toBeVisible();
+
+      // Expand a section to see Add Item button (sections start collapsed)
+      const firstSection = page.locator('.section-editor').first();
+      await firstSection.locator('.section-expand-btn').click();
+      await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
+      await expect(firstSection.locator('.btn-add-item')).toBeVisible();
 
       // Publish button should be visible in editor top bar
       await expect(page.locator('.editor-top-bar .btn-publish')).toBeVisible();
@@ -317,8 +337,10 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
+      // Expand the first section (sections start collapsed)
       const firstSection = page.locator('.section-editor').first();
-      const itemCountBefore = await firstSection.locator('.item-row').count();
+      await firstSection.locator('.section-expand-btn').click();
+      await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
       // Click Add Item in first section
       await firstSection.locator('.btn-add-item').click();
@@ -338,6 +360,11 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
+      // Expand first section (sections start collapsed)
+      const firstSection = page.locator('.section-editor').first();
+      await firstSection.locator('.section-expand-btn').click();
+      await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
+
       // Click Edit on first item
       const firstItem = page.locator('.item-row').first();
       await firstItem.locator('.btn-secondary.btn-small:has-text("Edit")').click();
@@ -352,9 +379,10 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       // Type select
       await expect(editor.locator('.item-editor-select').first()).toBeVisible();
 
-      // Required and Triggers Defect checkboxes
+      // Required and Triggers Defect checkboxes — count includes those in ConfigEditor too
       const checkboxes = editor.locator('.item-editor-checkbox');
-      await expect(checkboxes).toHaveCount(2);
+      await expect(checkboxes.first()).toBeVisible();
+      expect(await checkboxes.count()).toBeGreaterThanOrEqual(2);
 
       // Save and Cancel buttons
       await expect(editor.locator('.btn-primary.btn-small:has-text("Save")')).toBeVisible();
@@ -371,6 +399,11 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
     if (await draftCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
+
+      // Expand first section (sections start collapsed)
+      const firstSection = page.locator('.section-editor').first();
+      await firstSection.locator('.section-expand-btn').click();
+      await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
       // Click Edit on first item
       const firstItem = page.locator('.item-row').first();
