@@ -342,11 +342,14 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await firstSection.locator('.section-expand-btn').click();
       await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
+      const itemCountBefore = await firstSection.locator('.item-row').count();
+
       // Click Add Item in first section
       await firstSection.locator('.btn-add-item').click();
 
-      // Should show item editor form
-      await expect(firstSection.locator('.item-editor-form')).toBeVisible({ timeout: 5_000 });
+      // New item appears as an item-row with label "New Item" (editor not auto-opened)
+      await expect(firstSection.locator('.item-row')).toHaveCount(itemCountBefore + 1, { timeout: 5_000 });
+      await expect(firstSection.locator('.item-row').last().locator('.item-label')).toHaveText('New Item');
     }
   });
 
