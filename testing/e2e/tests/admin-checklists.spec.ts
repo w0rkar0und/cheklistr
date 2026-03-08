@@ -456,8 +456,26 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
 
       // Register handler before click — window.confirm blocks JS so click
       // won't resolve until the dialog is dismissed by this handler
-      page.once('dialog', (dialog) => dialog.accept());
+      let dialogHandled = false;
+      page.once('dialog', async (dialog) => {
+        dialogHandled = true;
+        await dialog.accept();
+      });
       await draftCard.locator('.btn-danger.btn-small:has-text("Delete")').click();
+
+      // Verify the dialog was actually handled
+      expect(dialogHandled).toBe(true);
+
+      // Wait for any loading cycle to complete
+      await page.waitForTimeout(2_000);
+
+      // Check if an error message appeared (indicates delete failed at DB level)
+      const errorMsg = page.locator('.error-message');
+      const hasError = await errorMsg.isVisible().catch(() => false);
+      if (hasError) {
+        const errorText = await errorMsg.textContent();
+        throw new Error(`Delete failed with DB error: ${errorText}`);
+      }
 
       // Wait for the version list to reload (loading state hides it briefly)
       await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
