@@ -2020,3 +2020,412 @@ button:disabled {
   color: var(--color-text-secondary);
   opacity: 0.7;
 }
+
+/* ==========================================
+   CHECKLIST MANAGEMENT — VERSION LIST
+   ========================================== */
+
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.version-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.version-card--active {
+  border-color: var(--color-success);
+  border-width: 2px;
+}
+
+.version-card--draft {
+  border-color: var(--color-warning);
+  border-style: dashed;
+}
+
+.version-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.version-number {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.version-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.version-badge--active {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.version-badge--draft {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.version-badge--previous {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+}
+
+.version-card-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.version-card-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.btn-publish {
+  background: var(--color-success);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-publish:hover {
+  background: #15803D;
+}
+
+/* ==========================================
+   CHECKLIST MANAGEMENT — VERSION EDITOR
+   ========================================== */
+
+.editor-top-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.editor-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+}
+
+.editor-title h2 {
+  font-size: 1.25rem;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.editor-stats {
+  display: flex;
+  gap: var(--space-xs);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+/* ==========================================
+   CHECKLIST MANAGEMENT — SECTIONS
+   ========================================== */
+
+.sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.section-editor {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-secondary);
+  gap: var(--space-sm);
+}
+
+.section-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.section-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.section-name-display {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 0.95rem;
+}
+
+.section-name-input {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-name-input:focus {
+  border-color: var(--color-accent);
+  background: #fff;
+  outline: none;
+}
+
+.section-item-count {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.section-header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.reorder-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  transition: background 0.1s;
+}
+
+.reorder-btn:hover:not(:disabled) {
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+}
+
+.reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ==========================================
+   CHECKLIST MANAGEMENT — ITEMS
+   ========================================== */
+
+.section-items {
+  padding: var(--space-sm) var(--space-md);
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-sm);
+}
+
+.item-row:last-of-type {
+  border-bottom: none;
+}
+
+.item-row-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.item-label {
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.field-type-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.field-type-badge--boolean { background: #DBEAFE; color: #1E40AF; }
+.field-type-badge--text { background: #E0E7FF; color: #3730A3; }
+.field-type-badge--number { background: #FEF3C7; color: #92400E; }
+.field-type-badge--image { background: #FCE7F3; color: #9D174D; }
+.field-type-badge--select { background: #D1FAE5; color: #065F46; }
+
+.item-badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+}
+
+.item-badge--required {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.item-badge--defect {
+  background: #FED7AA;
+  color: #9A3412;
+}
+
+.item-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.btn-add-item {
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  width: 100%;
+  margin-top: var(--space-xs);
+  transition: background 0.1s, color 0.1s;
+}
+
+.btn-add-item:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+}
+
+/* ==========================================
+   CHECKLIST MANAGEMENT — ITEM EDITOR
+   ========================================== */
+
+.item-editor-form {
+  background: #F8FAFC;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: var(--space-xs) 0;
+}
+
+.item-editor-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.item-editor-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 120px;
+}
+
+.item-editor-input {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.item-editor-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.item-editor-select {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.item-editor-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.item-editor-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.item-editor-actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.config-fields {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding: var(--space-sm);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-xs);
+}
