@@ -103,6 +103,17 @@ export async function generateSubmissionPdf(
   y += 6;
   doc.setTextColor(0, 0, 0);
 
+  // ── Archived watermark ──
+  if (submission.archived_at) {
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(220, 38, 38);
+    doc.text(`ARCHIVED — ${formatDate(submission.archived_at)}`, margin, y + 4);
+    y += 8;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+  }
+
   // ── Vehicle & Driver Info Table ──
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');

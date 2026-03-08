@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../stores/authStore';
 import { generateSubmissionPdf } from '../../lib/generateSubmissionPdf';
 import type { Submission, SubmissionPhoto, ChecklistResponse, Defect } from '../../types/database';
 
@@ -20,13 +21,54 @@ interface SubmitterInfo {
 export function AdminSubmissionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const profile = useAuthStore((s) => s.profile);
   const [submission, setSubmission] = useState<FullSubmission | null>(null);
   const [submitter, setSubmitter] = useState<SubmitterInfo | null>(null);
+  const [archivedByName, setArchivedByName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
+  const [archiving, setArchiving] = useState(false);
+
+  const isArchived = !!submission?.archived_at;
+
+  const handleArchiveToggle = async () => {
+    if (!submission || !profile) return;
+    const action = isArchived ? 'restore' : 'archive';
+    if (!window.confirm(`${action === 'archive' ? 'Archive' : 'Restore'} this submission?`)) return;
+
+    setArchiving(true);
+    try {
+      const updateData = isArchived
+        ? { archived_at: null, archived_by: null }
+        : { archived_at: new Date().toISOString(), archived_by: profile.id };
+
+      const { error: updateErr } = await supabase
+        .from('submissions')
+        .update(updateData)
+        .eq('id', submission.id);
+
+      if (updateErr) {
+        alert(`Failed to ${action} submission.`);
+        console.error(updateErr);
+      } else {
+        setSubmission({
+          ...submission,
+          archived_at: updateData.archived_at,
+          archived_by: updateData.archived_by,
+        });
+        if (!isArchived) {
+          setArchivedByName(profile.full_name);
+        } else {
+          setArchivedByName(null);
+        }
+      }
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleDownloadPdf = async () => {
     if (!submission) return;
@@ -136,6 +178,19 @@ export function AdminSubmissionDetail() {
         setSubmitter(userProfile as SubmitterInfo);
       }
 
+      // If archived, fetch the archiver's name
+      const typedSub = sub as Submission;
+      if (typedSub.archived_by) {
+        const { data: archiver } = await supabase
+          .from('users')
+          .select('full_name')
+          .eq('id', typedSub.archived_by)
+          .single();
+        if (archiver) {
+          setArchivedByName((archiver as { full_name: string }).full_name);
+        }
+      }
+
       // Flatten the response joins
       const flatResponses = (responses ?? []).map((r: Record<string, unknown>) => {
         const item = r.checklist_items as Record<string, unknown> | null;
@@ -200,6 +255,14 @@ export function AdminSubmissionDetail() {
         &larr; Back to Submissions
       </button>
 
+      {/* Archived banner */}
+      {isArchived && (
+        <div className="archived-banner">
+          Archived on {formatDate(submission.archived_at)}
+          {archivedByName && ` by ${archivedByName}`}
+        </div>
+      )}
+
       {/* Header */}
       <div className="detail-header">
         <div className="detail-header-left">
@@ -208,13 +271,24 @@ export function AdminSubmissionDetail() {
             {submission.status}
           </span>
         </div>
-        <button
-          className="btn-primary btn-pdf"
-          onClick={handleDownloadPdf}
-          disabled={pdfGenerating}
-        >
-          {pdfGenerating ? pdfProgress : 'Download PDF'}
-        </button>
+        <div className="detail-header-actions">
+          <button
+            className={isArchived ? 'btn-secondary btn-sm' : 'btn-danger btn-sm'}
+            onClick={handleArchiveToggle}
+            disabled={archiving}
+          >
+            {archiving
+              ? (isArchived ? 'Restoring…' : 'Archiving…')
+              : (isArchived ? 'Restore' : 'Archive')}
+          </button>
+          <button
+            className="btn-primary btn-pdf"
+            onClick={handleDownloadPdf}
+            disabled={pdfGenerating}
+          >
+            {pdfGenerating ? pdfProgress : 'Download PDF'}
+          </button>
+        </div>
       </div>
 
       {/* Vehicle & Driver Info */}
