@@ -262,15 +262,42 @@ export function AdminChecklists() {
     if (!window.confirm(`Delete draft Version ${version.version_number}? This cannot be undone.`)) return;
 
     setLoading(true);
-    const { error: delErr } = await supabase
-      .from('checklist_versions')
-      .delete()
-      .eq('id', version.id);
+    try {
+      // Manual cascade: items → sections → version
+      // 1. Get section IDs for this version
+      const { data: sections } = await supabase
+        .from('checklist_sections')
+        .select('id')
+        .eq('checklist_version_id', version.id);
 
-    if (delErr) {
-      setError(delErr.message);
-    } else {
+      if (sections && sections.length > 0) {
+        const sectionIds = sections.map((s: { id: string }) => s.id);
+
+        // 2. Delete all items in those sections
+        const { error: itemsErr } = await supabase
+          .from('checklist_items')
+          .delete()
+          .in('section_id', sectionIds);
+        if (itemsErr) throw itemsErr;
+
+        // 3. Delete all sections for this version
+        const { error: sectionsErr } = await supabase
+          .from('checklist_sections')
+          .delete()
+          .eq('checklist_version_id', version.id);
+        if (sectionsErr) throw sectionsErr;
+      }
+
+      // 4. Delete the version itself
+      const { error: versionErr } = await supabase
+        .from('checklist_versions')
+        .delete()
+        .eq('id', version.id);
+      if (versionErr) throw versionErr;
+
       await loadVersions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
     }
     setLoading(false);
   };
