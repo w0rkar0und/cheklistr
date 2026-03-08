@@ -39,11 +39,16 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
+    // Extract the bare JWT from "Bearer <token>"
+    const token = authHeader.replace('Bearer ', '');
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Pass the token explicitly — the global-header approach fails
+    // when the request originates from a Capacitor WebView.
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       console.error('Auth error:', authError?.message ?? 'No user');
       return jsonResponse({ error: 'Unauthorised' }, 401);
