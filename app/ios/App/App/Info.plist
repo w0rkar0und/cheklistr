@@ -16,6 +16,8 @@
 	<string>&quot;Cheklistr needs camera access to photograph vehicles during inspections&quot;</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>&quot;Cheklistr needs photo library access to attach existing vehicle photos&quot;</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>&quot;Cheklistr needs to save photos to your library&quot;</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>&quot;Cheklistr records your location when submitting vehicle inspections&quot;</string>
 	<key>NSFaceIDUsageDescription</key>
