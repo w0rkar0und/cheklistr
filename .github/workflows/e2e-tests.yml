@@ -1,0 +1,82 @@
+name: E2E Tests
+
+# ─── When to run ───────────────────────────────────────────────
+on:
+  # On every push to main
+  push:
+    branches: [main]
+
+  # On pull requests targeting main
+  pull_request:
+    branches: [main]
+
+  # Daily at 07:00 UTC (approx 07:00 GMT / 08:00 BST)
+  schedule:
+    - cron: '0 7 * * *'
+
+  # Manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+# ─── Jobs ──────────────────────────────────────────────────────
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: testing/e2e
+
+    steps:
+      # 1. Check out the repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: testing/e2e/package-lock.json
+
+      # 3. Install npm dependencies
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      # 4. Install Playwright browsers
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      # 5. Create .env from GitHub Secrets
+      - name: Create .env file
+        run: |
+          cat > .env << 'ENVEOF'
+          BASE_URL=${{ secrets.E2E_BASE_URL }}
+          TEST_USER_ID=${{ secrets.E2E_TEST_USER_ID }}
+          TEST_USER_PASSWORD=${{ secrets.E2E_TEST_USER_PASSWORD }}
+          ADMIN_USER_ID=${{ secrets.E2E_ADMIN_USER_ID }}
+          ADMIN_USER_PASSWORD=${{ secrets.E2E_ADMIN_USER_PASSWORD }}
+          ENVEOF
+
+      # 6. Run Playwright tests
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      # 7. Upload HTML report as artifact (always, even on failure)
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      # 8. Upload failure screenshots/videos
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
