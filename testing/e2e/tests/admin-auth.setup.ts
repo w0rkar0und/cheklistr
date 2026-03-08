@@ -35,12 +35,12 @@ setup('authenticate as admin user', async ({ page }) => {
   await page.fill('#login-id', userId);
   await page.fill('#password', password);
 
-  // Submit and wait for navigation to home page
+  // Submit and wait for navigation — admin users are redirected to /admin
   await page.click('button[type="submit"]');
-  await expect(page).toHaveURL('/', { timeout: 15_000 });
+  await expect(page).toHaveURL('/admin', { timeout: 15_000 });
 
-  // Confirm we landed on the home page (greeting visible)
-  await expect(page.locator('.home-greeting h2')).toContainText('Welcome', {
+  // Confirm we landed on the admin dashboard
+  await expect(page.locator('.admin-layout')).toBeVisible({
     timeout: 10_000,
   });
 
