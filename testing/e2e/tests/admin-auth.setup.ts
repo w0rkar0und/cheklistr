@@ -1,0 +1,50 @@
+import { test as setup, expect } from '@playwright/test';
+import path from 'path';
+import fs from 'fs';
+
+const authDir = path.join(__dirname, '..', 'test-results', '.auth');
+const authFile = path.join(authDir, 'admin.json');
+
+/**
+ * Authenticates as the admin user and saves browser state (cookies, localStorage)
+ * so all admin tests skip the login flow.
+ */
+setup('authenticate as admin user', async ({ page }) => {
+  const userId = process.env.ADMIN_USER_ID;
+  const password = process.env.ADMIN_USER_PASSWORD;
+
+  if (!userId || !password) {
+    throw new Error(
+      'Missing ADMIN_USER_ID or ADMIN_USER_PASSWORD in .env — cannot authenticate as admin.'
+    );
+  }
+
+  // Navigate to login page and wait for React to fully hydrate
+  await page.goto('/login', { waitUntil: 'networkidle' });
+
+  // Debug: log what the page actually rendered (visible in CI logs on failure)
+  const pageTitle = await page.title();
+  const bodyText = await page.locator('body').innerText().catch(() => '(empty)');
+  console.log(`[admin-auth-setup] Page title: "${pageTitle}"`);
+  console.log(`[admin-auth-setup] Body text preview: "${bodyText.substring(0, 200)}"`);
+
+  // Wait for the React app to mount — the login form input is a reliable marker
+  await expect(page.locator('#login-id')).toBeVisible({ timeout: 15_000 });
+
+  // Fill login form
+  await page.fill('#login-id', userId);
+  await page.fill('#password', password);
+
+  // Submit and wait for navigation to home page
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL('/', { timeout: 15_000 });
+
+  // Confirm we landed on the home page (greeting visible)
+  await expect(page.locator('.home-greeting h2')).toContainText('Welcome', {
+    timeout: 10_000,
+  });
+
+  // Ensure auth directory exists and save state
+  fs.mkdirSync(authDir, { recursive: true });
+  await page.context().storageState({ path: authFile });
+});

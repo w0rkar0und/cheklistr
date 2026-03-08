@@ -6,6 +6,7 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const authStatePath = path.join(__dirname, 'test-results', '.auth', 'user.json');
+const adminAuthStatePath = path.join(__dirname, 'test-results', '.auth', 'admin.json');
 
 export default defineConfig({
   testDir: './tests',
@@ -34,6 +35,12 @@ export default defineConfig({
       testMatch: /auth\.setup\.ts/,
     },
 
+    // Admin auth setup — separate login for admin-only tests
+    {
+      name: 'admin-auth-setup',
+      testMatch: /admin-auth\.setup\.ts/,
+    },
+
     // Desktop Chrome tests (use saved auth state)
     {
       name: 'chromium',
@@ -41,6 +48,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: authStatePath,
       },
+      testIgnore: /admin\.spec\.ts/,
       dependencies: ['auth-setup'],
     },
 
@@ -51,7 +59,19 @@ export default defineConfig({
         ...devices['Pixel 7'],
         storageState: authStatePath,
       },
+      testIgnore: /admin\.spec\.ts/,
       dependencies: ['auth-setup'],
+    },
+
+    // Admin tests — Desktop Chrome with admin session state
+    {
+      name: 'admin-chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: adminAuthStatePath,
+      },
+      testMatch: /admin\.spec\.ts/,
+      dependencies: ['admin-auth-setup'],
     },
   ],
 });
