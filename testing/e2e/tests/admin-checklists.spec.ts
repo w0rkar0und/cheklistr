@@ -443,6 +443,31 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await expect(upBtn).toBeDisabled();
     }
   });
+
+  // ⚠️ MUST remain the LAST test in this block — it deletes the draft version
+  test('deleting a draft version removes it from the list', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+
+    const draftCard = page.locator('.version-card--draft');
+
+    if (await draftCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      const versionCountBefore = await page.locator('.version-card').count();
+
+      // Accept the confirmation dialog that will appear
+      page.on('dialog', (dialog) => dialog.accept());
+
+      // Click Delete on the draft card
+      await draftCard.locator('.btn-danger.btn-small:has-text("Delete")').click();
+
+      // Draft card should disappear and version count should decrease
+      await expect(draftCard).not.toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('.version-card')).toHaveCount(versionCountBefore - 1);
+
+      // Create New Draft button should be enabled again (no draft exists)
+      await expect(page.locator('.btn-primary:has-text("Create New Draft")')).toBeEnabled();
+    }
+  });
 });
 
 // ─── Checklist Management — Navigation ──────────────────────────
