@@ -47,7 +47,7 @@ export interface PendingSubmission {
   defects: PendingDefect[];
   latitude: number;
   longitude: number;
-  tsFormStarted: string;
+  tsFormStarted: string | null;
   tsFormReviewed: string | null;
   tsFormSubmitted: string;
   createdAt: string;
