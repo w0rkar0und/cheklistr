@@ -277,7 +277,7 @@ export function AdminChecklists() {
         const sectionIds = sections.map((s: { id: string }) => s.id);
 
         // 2. Delete all items in those sections
-        const { data: deletedItems, error: itemsErr } = await supabase
+        const { error: itemsErr } = await supabase
           .from('checklist_items')
           .delete()
           .in('section_id', sectionIds)
