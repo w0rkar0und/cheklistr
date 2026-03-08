@@ -278,7 +278,7 @@ test.describe('Admin Users', () => {
       const text = await options.nth(i).textContent();
       if (text) optionTexts.push(text.trim().toLowerCase());
     }
-    expect(optionTexts).toContain('site_manager');
+    expect(optionTexts).toContain('site manager');
     expect(optionTexts).toContain('admin');
   });
 
