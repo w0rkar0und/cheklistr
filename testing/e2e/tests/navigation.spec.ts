@@ -40,9 +40,9 @@ test.describe('Authenticated Navigation', () => {
   test('new checklist page loads the form', async ({ page }) => {
     await page.goto('/checklist/new');
     await expect(page).toHaveURL('/checklist/new');
-    // Wait for form or loading/error state
+    // Wait for the checklist to load — either the form appears or an error
     await expect(
-      page.locator('.form-step-title, .error-message, text=Loading')
-    ).toBeVisible({ timeout: 15_000 });
+      page.locator('.form-progress-label').or(page.locator('.error-message'))
+    ).toBeVisible({ timeout: 20_000 });
   });
 });

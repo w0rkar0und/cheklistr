@@ -55,9 +55,10 @@ test.describe('New Checklist — Vehicle Info Step', () => {
 
     await page.click('button:has-text("Continue to Photos")');
 
-    // Should now be on the Photos step (step 2)
-    // Look for step indicator or photo-related content
-    await expect(page.locator('text=Step 2')).toBeVisible({ timeout: 5_000 });
+    // Step progress label shows "Step 2 of 5"
+    await expect(page.locator('.form-progress-label')).toContainText('Step 2 of 5', {
+      timeout: 5_000,
+    });
   });
 });
 
@@ -77,14 +78,15 @@ test.describe('New Checklist — Multi-Step Navigation', () => {
     await page.fill('#colour', 'Blue');
     await page.click('button:has-text("Continue to Photos")');
 
-    // Step 2: Photos — skip (photos are optional)
-    await expect(page.locator('text=Step 2')).toBeVisible({ timeout: 5_000 });
-    const skipPhotosBtn = page.locator('button:has-text("Skip"), button:has-text("Continue")');
-    if (await skipPhotosBtn.isVisible()) {
-      await skipPhotosBtn.click();
-    }
+    // Step 2: Photos — progress shows step 2, click Continue to Checklist
+    await expect(page.locator('.form-progress-label')).toContainText('Step 2 of 5', {
+      timeout: 5_000,
+    });
+    await page.click('button:has-text("Continue to Checklist")');
 
-    // Step 3: Checklist responses — look for the section view
-    await expect(page.locator('text=Step 3')).toBeVisible({ timeout: 5_000 });
+    // Step 3: Checklist responses
+    await expect(page.locator('.form-progress-label')).toContainText('Step 3 of 5', {
+      timeout: 5_000,
+    });
   });
 });

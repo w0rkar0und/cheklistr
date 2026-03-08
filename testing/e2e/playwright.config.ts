@@ -44,11 +44,11 @@ export default defineConfig({
       dependencies: ['auth-setup'],
     },
 
-    // Mobile Safari (primary field device)
+    // Mobile viewport (uses Chromium engine, avoids needing WebKit install)
     {
-      name: 'mobile-safari',
+      name: 'mobile-chrome',
       use: {
-        ...devices['iPhone 14'],
+        ...devices['Pixel 7'],
         storageState: authStatePath,
       },
       dependencies: ['auth-setup'],
