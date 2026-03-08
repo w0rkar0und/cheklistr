@@ -454,11 +454,11 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
     if (await draftCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const versionCountBefore = await page.locator('.version-card').count();
 
-      // Accept the confirmation dialog that will appear
-      page.on('dialog', (dialog) => dialog.accept());
-
-      // Click Delete on the draft card
+      // Set up dialog listener BEFORE clicking, then click and accept
+      const dialogPromise = page.waitForEvent('dialog');
       await draftCard.locator('.btn-danger.btn-small:has-text("Delete")').click();
+      const dialog = await dialogPromise;
+      await dialog.accept();
 
       // Wait for the version list to reload (loading state hides it briefly)
       await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
