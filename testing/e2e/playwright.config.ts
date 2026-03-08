@@ -48,7 +48,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: authStatePath,
       },
-      testIgnore: /admin\.spec\.ts/,
+      testIgnore: /(admin|api-).*\.spec\.ts/,
       dependencies: ['auth-setup'],
     },
 
@@ -59,7 +59,7 @@ export default defineConfig({
         ...devices['Pixel 7'],
         storageState: authStatePath,
       },
-      testIgnore: /admin\.spec\.ts/,
+      testIgnore: /(admin|api-).*\.spec\.ts/,
       dependencies: ['auth-setup'],
     },
 
@@ -72,6 +72,16 @@ export default defineConfig({
       },
       testMatch: /admin\.spec\.ts/,
       dependencies: ['admin-auth-setup'],
+    },
+
+    // API tests — no browser needed, authenticate via Supabase REST API directly
+    {
+      name: 'api',
+      testMatch: /api-.*\.spec\.ts/,
+      use: {
+        // No browser context needed for pure API tests
+        storageState: { cookies: [], origins: [] },
+      },
     },
   ],
 });

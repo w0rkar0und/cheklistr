@@ -11,7 +11,12 @@
     "test:report": "npx playwright show-report",
     "test:login": "npx playwright test tests/login.spec.ts",
     "test:checklist": "npx playwright test tests/checklist.spec.ts",
-    "test:admin": "npx playwright test tests/admin.spec.ts"
+    "test:admin": "npx playwright test tests/admin.spec.ts",
+    "test:submission": "npx playwright test tests/submission.spec.ts",
+    "test:api": "npx playwright test --project=api",
+    "test:api:auth": "npx playwright test tests/api-auth.spec.ts",
+    "test:api:rls": "npx playwright test tests/api-rls.spec.ts",
+    "test:api:data": "npx playwright test tests/api-data.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0"
