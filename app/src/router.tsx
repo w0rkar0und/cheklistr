@@ -11,6 +11,7 @@ import { AdminSubmissionDetail } from './pages/admin/AdminSubmissionDetail';
 import { AdminChecklists } from './pages/admin/AdminChecklists';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminSessions } from './pages/admin/AdminSessions';
+import { PendingSubmissionsPage } from './pages/checklist/PendingSubmissionsPage';
 
 export const router = createBrowserRouter([
   // Public routes
@@ -36,7 +37,10 @@ export const router = createBrowserRouter([
         path: 'checklist/new',
         element: <NewChecklistPage />,
       },
-      // Future: checklist/:id for viewing/editing drafts
+      {
+        path: 'pending',
+        element: <PendingSubmissionsPage />,
+      },
     ],
   },
 

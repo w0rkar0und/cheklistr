@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { cacheChecklist, getCachedChecklist } from './offlineDb';
 import type {
   Checklist,
   ChecklistVersion,
@@ -98,5 +99,34 @@ export async function fetchActiveChecklist(): Promise<{
     })),
   };
 
+  // Cache the checklist for offline use
+  try {
+    await cacheChecklist(checklist, fullVersion);
+    console.log('[CHECKLIST] Cached checklist for offline use');
+  } catch (cacheErr) {
+    console.error('[CHECKLIST] Failed to cache checklist:', cacheErr);
+  }
+
   return { checklist, version: fullVersion, error: null };
+}
+
+/**
+ * Attempt to load the checklist from IndexedDB cache.
+ * Used as a fallback when the network fetch fails.
+ */
+export async function fetchCachedChecklist(): Promise<{
+  checklist: Checklist | null;
+  version: FullChecklistVersion | null;
+  error: string | null;
+}> {
+  try {
+    const cached = await getCachedChecklist();
+    if (cached) {
+      console.log('[CHECKLIST] Loaded from offline cache (cached at', cached.cachedAt, ')');
+      return { checklist: cached.checklist, version: cached.version, error: null };
+    }
+    return { checklist: null, version: null, error: 'No cached checklist available' };
+  } catch (err) {
+    return { checklist: null, version: null, error: 'Failed to read checklist cache' };
+  }
 }

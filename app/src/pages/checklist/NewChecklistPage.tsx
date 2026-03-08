@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChecklistStore } from '../../stores/checklistStore';
 import { useAuthStore } from '../../stores/authStore';
-import { fetchActiveChecklist } from '../../lib/checklist';
+import { fetchActiveChecklist, fetchCachedChecklist } from '../../lib/checklist';
 import { VehicleInfoStep } from '../../components/checklist/VehicleInfoStep';
 import { VehiclePhotosStep } from '../../components/checklist/VehiclePhotosStep';
 import { ChecklistSectionView } from '../../components/checklist/ChecklistSectionView';
@@ -10,7 +10,10 @@ import { DefectsStep } from '../../components/checklist/DefectsStep';
 import { ReviewStep } from '../../components/checklist/ReviewStep';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
+import { savePendingSubmission, getPendingCount } from '../../lib/offlineDb';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { ResponseValue } from '../../stores/checklistStore';
+import type { PendingPhoto, PendingDefect, PendingResponse } from '../../lib/offlineDb';
 
 /** Race a promise against a timeout. Rejects with a clear message if the timeout wins. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -24,33 +27,50 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 const STEPS = ['vehicle-info', 'photos', 'checklist', 'defects', 'review'] as const;
 
+const MAX_PENDING = 10;
+
 export function NewChecklistPage() {
   const navigate = useNavigate();
   const store = useChecklistStore();
   const profile = useAuthStore((s) => s.profile);
+  const { isOnline } = useOnlineStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Load the active checklist on mount
+  // Load the active checklist on mount (with offline fallback)
   useEffect(() => {
     const load = async () => {
       store.setLoading(true);
       store.setLoadError(null);
 
+      // Try network first
       const { checklist, version, error } = await fetchActiveChecklist();
-      if (error || !checklist || !version) {
-        store.setLoadError(error ?? 'Failed to load checklist');
+      if (!error && checklist && version) {
+        store.setChecklistData(checklist, version);
+        if (profile?.site_code) {
+          store.setDriverInfo({ site: profile.site_code });
+        }
+        store.setFormStarted();
         store.setLoading(false);
         return;
       }
 
-      store.setChecklistData(checklist, version);
-      // Default driver site to the logged-in user's site
-      if (profile?.site_code) {
-        store.setDriverInfo({ site: profile.site_code });
+      // Network failed — try offline cache
+      console.log('[CHECKLIST] Network fetch failed, trying cache…');
+      const cached = await fetchCachedChecklist();
+      if (cached.checklist && cached.version) {
+        store.setChecklistData(cached.checklist, cached.version);
+        if (profile?.site_code) {
+          store.setDriverInfo({ site: profile.site_code });
+        }
+        store.setFormStarted();
+        store.setLoading(false);
+        return;
       }
-      store.setFormStarted();
+
+      // Both failed
+      store.setLoadError(error ?? 'Failed to load checklist — no cached version available');
       store.setLoading(false);
     };
 
@@ -84,6 +104,21 @@ export function NewChecklistPage() {
 
     setIsSubmitting(true);
     setSubmitError(null);
+
+    // If offline, skip network attempt entirely and save locally
+    if (!isOnline) {
+      try {
+        await saveSubmissionOffline();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setSubmitError(`Offline save failed: ${msg}`);
+      } finally {
+        setIsSubmitting(false);
+        setSubmitProgress('');
+      }
+      return;
+    }
+
     setSubmitProgress('Checking auth…');
 
     try {
@@ -369,13 +404,138 @@ export function NewChecklistPage() {
       store.resetForm();
       navigate('/', { replace: true });
     } catch (err: unknown) {
-      console.error('[SUBMIT] FATAL:', err);
+      console.error('[SUBMIT] Network submission failed:', err);
       const msg = err instanceof Error ? err.message : String(err);
+
+      // If not a geolocation / auth error, try saving offline
+      if (
+        !msg.includes('Location access is required') &&
+        !msg.includes('No auth token found')
+      ) {
+        console.log('[SUBMIT] Attempting offline save…');
+        try {
+          await saveSubmissionOffline();
+          return; // navigate happens inside saveSubmissionOffline
+        } catch (offlineErr) {
+          console.error('[SUBMIT] Offline save also failed:', offlineErr);
+        }
+      }
+
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
       setSubmitProgress('');
     }
+  };
+
+  /** Save the current form state to IndexedDB for later sync. */
+  const saveSubmissionOffline = async () => {
+    if (!store.version || !profile) return;
+
+    // Check queue capacity
+    const pendingCount = await getPendingCount();
+    if (pendingCount >= MAX_PENDING) {
+      setSubmitError(`Offline queue is full (${MAX_PENDING} submissions). Please sync existing submissions first.`);
+      return;
+    }
+
+    setSubmitProgress('Saving offline…');
+
+    // Capture GPS (works offline — GPS doesn't need internet)
+    let geoLatitude = 0;
+    let geoLongitude = 0;
+    try {
+      const position = await withTimeout(
+        new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 60000,
+          });
+        }),
+        20000,
+        'Geolocation'
+      );
+      geoLatitude = position.coords.latitude;
+      geoLongitude = position.coords.longitude;
+    } catch {
+      // GPS optional for offline — can't block the save
+      console.warn('[SUBMIT] GPS unavailable for offline save');
+    }
+
+    // Compress photos and collect as blobs
+    const photos: PendingPhoto[] = [];
+    const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
+      ([, pd]) => pd.file != null
+    );
+
+    for (const [photoType, photoData] of photoEntries) {
+      if (!photoData.file) continue;
+      try {
+        const compressed = await compressImage(photoData.file);
+        photos.push({ photoType, blob: compressed });
+      } catch {
+        console.error(`[SUBMIT] Compression failed for ${photoType}`);
+      }
+    }
+
+    // Collect defects with image blobs
+    const defects: PendingDefect[] = [];
+    for (let i = 0; i < store.defects.length; i++) {
+      const d = store.defects[i];
+      let imageBlob: Blob | null = null;
+      if (d.imageFile) {
+        try {
+          imageBlob = await compressImage(d.imageFile);
+        } catch {
+          console.error(`[SUBMIT] Defect image compression failed (${i + 1})`);
+        }
+      }
+      defects.push({
+        defectNumber: i + 1,
+        details: d.details,
+        imageBlob,
+      });
+    }
+
+    // Collect responses
+    const responses: PendingResponse[] = Array.from(store.responses.values())
+      .filter((r) => hasValue(r))
+      .map((r) => ({
+        checklistItemId: r.itemId,
+        valueBoolean: r.valueBoolean,
+        valueText: r.valueText,
+        valueNumber: r.valueNumber,
+        valueImageUrl: r.valueImageUrl,
+      }));
+
+    const hrCode = store.driverInfo.hrCode ? store.driverInfo.hrCode.substring(0, 7) : '';
+
+    await savePendingSubmission({
+      submissionId: crypto.randomUUID(),
+      userId: profile.id,
+      checklistVersionId: store.version.id,
+      vehicleRegistration: store.vehicleInfo.vehicleRegistration,
+      mileage: store.vehicleInfo.mileage,
+      makeModel: store.vehicleInfo.makeModel,
+      colour: store.vehicleInfo.colour,
+      contractorId: hrCode,
+      contractorName: store.driverInfo.name,
+      siteCode: store.driverInfo.site || profile.site_code || '',
+      responses,
+      photos,
+      defects,
+      latitude: geoLatitude,
+      longitude: geoLongitude,
+      tsFormStarted: store.tsFormStarted,
+      tsFormReviewed: store.tsFormReviewed,
+      tsFormSubmitted: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    });
+
+    console.log('[SUBMIT] Saved to offline queue');
+    store.resetForm();
+    navigate('/', { replace: true, state: { offlineSaved: true } });
   };
 
   // Loading state

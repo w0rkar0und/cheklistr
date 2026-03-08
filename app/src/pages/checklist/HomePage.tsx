@@ -1,16 +1,44 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { signOut } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
+import { getPendingCount } from '../../lib/offlineDb';
 import type { Submission } from '../../types/database';
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile);
   const appSession = useAuthStore((s) => s.appSession);
   const navigate = useNavigate();
+  const location = useLocation();
   const [recentSubmissions, setRecentSubmissions] = useState<Submission[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [offlineSavedMsg, setOfflineSavedMsg] = useState(false);
+
+  // Check for offline-saved navigation state
+  useEffect(() => {
+    const state = location.state as { offlineSaved?: boolean } | null;
+    if (state?.offlineSaved) {
+      setOfflineSavedMsg(true);
+      // Clear the state so it doesn't show again on refresh
+      window.history.replaceState({}, '');
+      setTimeout(() => setOfflineSavedMsg(false), 5000);
+    }
+  }, [location.state]);
+
+  // Load pending submission count
+  useEffect(() => {
+    const loadPending = async () => {
+      try {
+        const count = await getPendingCount();
+        setPendingCount(count);
+      } catch {
+        // IndexedDB might not be available
+      }
+    };
+    loadPending();
+  }, []);
 
   // Load recent submissions for this user
   useEffect(() => {
@@ -52,6 +80,25 @@ export function HomePage() {
           {profile?.site_code && <span>{profile.site_code}</span>}
         </p>
       </div>
+
+      {offlineSavedMsg && (
+        <div className="success-message">
+          Submission saved offline — sync when you have signal.
+        </div>
+      )}
+
+      {pendingCount > 0 && (
+        <button
+          className="pending-badge-card"
+          onClick={() => navigate('/pending')}
+        >
+          <span className="pending-badge-count">{pendingCount}</span>
+          <span className="pending-badge-text">
+            submission{pendingCount !== 1 ? 's' : ''} pending sync
+          </span>
+          <span className="pending-badge-arrow">→</span>
+        </button>
+      )}
 
       <button
         className="btn-primary btn-large"

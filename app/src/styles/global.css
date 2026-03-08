@@ -1785,3 +1785,238 @@ button:disabled {
   gap: var(--space-xs);
   align-items: center;
 }
+
+/* ==========================================
+   OFFLINE INDICATOR
+   ========================================== */
+
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: var(--color-warning);
+  color: #fff;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.offline-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ==========================================
+   PENDING SUBMISSIONS - HOME BADGE
+   ========================================== */
+
+.pending-badge-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  background: #FEF3C7;
+  border: 2px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #92400E;
+  transition: background 0.15s;
+}
+
+.pending-badge-card:hover {
+  background: #FDE68A;
+}
+
+.pending-badge-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.pending-badge-text {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+}
+
+.pending-badge-arrow {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+/* ==========================================
+   PENDING SUBMISSIONS PAGE
+   ========================================== */
+
+.pending-page {
+  padding: var(--space-md);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.pending-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.pending-header h2 {
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: var(--space-xs);
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.pending-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.pending-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.pending-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid var(--color-warning);
+}
+
+.pending-card-details {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.pending-card-meta {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.pending-card-actions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+}
+
+/* ==========================================
+   SYNC PROGRESS
+   ========================================== */
+
+.sync-progress-bar {
+  background: #EFF6FF;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.sync-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.sync-step {
+  color: var(--color-text-secondary);
+}
+
+.sync-progress-track {
+  height: 6px;
+  background: #DBEAFE;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sync-progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* ==========================================
+   SUCCESS MESSAGE
+   ========================================== */
+
+.success-message {
+  background: #DCFCE7;
+  border: 1px solid var(--color-success);
+  color: #166534;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.empty-state-card {
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+  color: var(--color-text-secondary);
+}
+
+.empty-state-sub {
+  font-size: 0.85rem;
+  margin-top: var(--space-xs);
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}

@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth';
 import { useAuthStore } from './stores/authStore';
 import { SessionExpiryOverlay } from './components/common/SessionExpiryOverlay';
 import { PwaInstallBanner } from './components/common/PwaInstallBanner';
+import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { router } from './router';
 import './styles/global.css';
 
@@ -22,6 +23,7 @@ function App() {
 
   return (
     <>
+      <OfflineIndicator />
       <RouterProvider router={router} />
       <PwaInstallBanner />
       {isSessionExpired && <SessionExpiryOverlay />}
