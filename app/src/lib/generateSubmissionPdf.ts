@@ -33,24 +33,65 @@ function formatResponseValue(r: ResponseWithLabels): string {
   return '—';
 }
 
+/** Loaded image data with natural dimensions for correct aspect ratio rendering. */
+interface LoadedImage {
+  dataUrl: string;
+  /** Natural width in pixels */
+  width: number;
+  /** Natural height in pixels */
+  height: number;
+}
+
 /**
- * Load an image URL as a base64 data URL for embedding in the PDF.
+ * Load an image URL as a base64 data URL with natural dimensions.
  * Returns null if the image fails to load.
  */
-async function loadImageAsBase64(url: string): Promise<string | null> {
+async function loadImageAsBase64(url: string): Promise<LoadedImage | null> {
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
     const blob = await response.blob();
-    return new Promise((resolve) => {
+
+    // Read blob as data URL
+    const dataUrl = await new Promise<string | null>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
+    if (!dataUrl) return null;
+
+    // Decode image to get natural dimensions
+    const dims = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => reject(new Error('Image decode failed'));
+      img.src = dataUrl;
+    });
+
+    return { dataUrl, width: dims.width, height: dims.height };
   } catch {
     return null;
   }
+}
+
+/**
+ * Calculate display dimensions (mm) that fit within maxW × maxH
+ * while preserving the image's natural aspect ratio.
+ */
+function fitImage(
+  img: LoadedImage,
+  maxW: number,
+  maxH: number
+): { w: number; h: number } {
+  const ratio = img.width / img.height;
+  let w = maxW;
+  let h = w / ratio;
+  if (h > maxH) {
+    h = maxH;
+    w = h * ratio;
+  }
+  return { w, h };
 }
 
 /**
@@ -270,10 +311,12 @@ export async function generateSubmissionPdf(
         onProgress?.('Loading defect image…');
         const imgData = await loadImageAsBase64(defect.image_url);
         if (imgData) {
-          checkPage(55);
+          // Fit within 60mm wide × 80mm tall, preserving aspect ratio
+          const { w, h } = fitImage(imgData, 60, 80);
+          checkPage(h + 8);
           try {
-            doc.addImage(imgData, 'JPEG', margin, y, 50, 37.5);
-            y += 40;
+            doc.addImage(imgData.dataUrl, 'JPEG', margin, y, w, h);
+            y += h + 3;
           } catch {
             // skip if image can't be embedded
           }
@@ -294,7 +337,7 @@ export async function generateSubmissionPdf(
     y += 10;
 
     // Load all photos in parallel
-    const photoEntries: { photo: SubmissionPhoto; data: string }[] = [];
+    const photoEntries: { photo: SubmissionPhoto; data: LoadedImage }[] = [];
     const loadPromises = submission.photos.map(async (photo) => {
       onProgress?.(`Loading ${photo.photo_type.replace(/_/g, ' ')}…`);
       const data = await loadImageAsBase64(photo.storage_url);
@@ -308,17 +351,22 @@ export async function generateSubmissionPdf(
     const photoOrder = submission.photos.map((p) => p.id);
     photoEntries.sort((a, b) => photoOrder.indexOf(a.photo.id) - photoOrder.indexOf(b.photo.id));
 
-    // Layout: 2 columns, 3 rows per page
-    const imgW = (contentWidth - 6) / 2;
-    const imgH = imgW * 0.75;
+    // Layout: 2 columns. Each cell gets half the content width.
+    // Photos are fitted within the cell preserving their native aspect ratio.
+    const cellW = (contentWidth - 6) / 2;
+    const maxCellH = 100; // max height per photo in mm (portrait photos are tall)
     let col = 0;
+    let rowH = 0; // tallest image in the current row
 
     for (const entry of photoEntries) {
-      checkPage(imgH + 12);
-      const x = margin + col * (imgW + 6);
+      const { w, h } = fitImage(entry.data, cellW, maxCellH);
+      checkPage(h + 12);
+      const x = margin + col * (cellW + 6);
 
       try {
-        doc.addImage(entry.data, 'JPEG', x, y, imgW, imgH);
+        // Centre the image horizontally within the cell
+        const xOffset = (cellW - w) / 2;
+        doc.addImage(entry.data.dataUrl, 'JPEG', x + xOffset, y, w, h);
       } catch {
         // skip unembeddable images
       }
@@ -328,19 +376,23 @@ export async function generateSubmissionPdf(
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
       const label = entry.photo.photo_type.replace(/_/g, ' ');
-      doc.text(label, x + imgW / 2, y + imgH + 4, { align: 'center' });
+      doc.text(label, x + cellW / 2, y + h + 4, { align: 'center' });
       doc.setTextColor(0, 0, 0);
+
+      // Track the tallest image in this row
+      if (h > rowH) rowH = h;
 
       col++;
       if (col >= 2) {
         col = 0;
-        y += imgH + 10;
+        y += rowH + 10;
+        rowH = 0;
       }
     }
 
     // If we ended on the first column, advance y
     if (col === 1) {
-      y += imgH + 10;
+      y += rowH + 10;
     }
   }
 
