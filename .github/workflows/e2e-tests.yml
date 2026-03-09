@@ -24,10 +24,6 @@ on:
       - 'app/package.json'
       - 'app/vercel.json'
 
-  # Every 2 hours from 08:00–22:00 UTC (approx 08:00–22:00 GMT / 09:00–23:00 BST)
-  schedule:
-    - cron: '0 8,10,12,14,16,18,20,22 * * *'
-
   # Manual trigger from GitHub Actions UI
   workflow_dispatch:
 
@@ -36,7 +32,7 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: testing/e2e
@@ -62,7 +58,14 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      # 5. Create .env from GitHub Secrets
+      # 5. Wait for Vercel deployment to complete
+      - name: Wait for Vercel build
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: |
+          echo "Waiting 3 minutes for Vercel deployment to complete…"
+          sleep 180
+
+      # 6. Create .env from GitHub Secrets
       - name: Create .env file
         run: |
           cat > .env << 'ENVEOF'
@@ -73,11 +76,11 @@ jobs:
           ADMIN_USER_PASSWORD=${{ secrets.E2E_ADMIN_USER_PASSWORD }}
           ENVEOF
 
-      # 6. Run Playwright tests
+      # 7. Run Playwright tests
       - name: Run Playwright tests
         run: npx playwright test
 
-      # 7. Upload HTML report as artifact (always, even on failure)
+      # 8. Upload HTML report as artifact (always, even on failure)
       - name: Upload test report
         uses: actions/upload-artifact@v4
         if: always()
@@ -86,7 +89,7 @@ jobs:
           path: testing/e2e/playwright-report/
           retention-days: 14
 
-      # 8. Upload failure screenshots/videos
+      # 9. Upload failure screenshots/videos
       - name: Upload test results on failure
         uses: actions/upload-artifact@v4
         if: failure()

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useChecklistStore } from '../../stores/checklistStore';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchActiveChecklist, fetchCachedChecklist } from '../../lib/checklist';
@@ -10,11 +10,11 @@ import { DefectsStep } from '../../components/checklist/DefectsStep';
 import { ReviewStep } from '../../components/checklist/ReviewStep';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
-import { savePendingSubmission, getPendingCount } from '../../lib/offlineDb';
+import { savePendingSubmission, getPendingCount, saveDraft, deleteDraft, getDraft } from '../../lib/offlineDb';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { getCurrentLocation } from '../../lib/nativeGeolocation';
 import type { ResponseValue } from '../../stores/checklistStore';
-import type { PendingPhoto, PendingDefect, PendingResponse } from '../../lib/offlineDb';
+import type { PendingPhoto, PendingDefect, PendingResponse, DraftResponse, DraftPhoto, DraftDefect } from '../../lib/offlineDb';
 
 /** Race a promise against a timeout. Rejects with a clear message if the timeout wins. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -28,51 +28,146 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 const STEPS = ['vehicle-info', 'photos', 'checklist', 'defects', 'review'] as const;
 
+/** Convert an object-URL (blob:…) to a File. Used for draft-restored photos where file is null. */
+async function blobUrlToFile(url: string, name: string): Promise<File> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new File([blob], name, { type: blob.type || 'image/jpeg' });
+}
+
 const MAX_PENDING = 10;
 
 export function NewChecklistPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const store = useChecklistStore();
   const profile = useAuthStore((s) => s.profile);
   const { isOnline } = useOnlineStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
-  // Load the active checklist on mount (with offline fallback)
+  // Load the active checklist on mount (with offline fallback).
+  // If resuming a draft, we load it directly from IndexedDB (not the store)
+  // so there's no race condition with store resets or React strict-mode re-mounts.
   useEffect(() => {
+    const locState = location.state as { resumedDraft?: boolean } | null;
+    const isResuming = locState?.resumedDraft === true;
+
+    // Clear the navigation state so a browser refresh doesn't re-trigger
+    if (isResuming) {
+      window.history.replaceState({}, '');
+    }
+
     const load = async () => {
       store.setLoading(true);
       store.setLoadError(null);
 
-      // Try network first
-      const { checklist, version, error } = await fetchActiveChecklist();
-      if (!error && checklist && version) {
-        store.setChecklistData(checklist, version);
-        if (profile?.site_code) {
-          store.setDriverInfo({ site: profile.site_code });
-        }
-        store.setFormStarted();
-        store.setLoading(false);
-        return;
-      }
+      try {
+        // Try network first
+        const { checklist, version, error } = await fetchActiveChecklist();
+        if (!error && checklist && version) {
+          store.setChecklistData(checklist, version); // resets responses to defaults
 
-      // Network failed — try offline cache
-      console.log('[CHECKLIST] Network fetch failed, trying cache…');
-      const cached = await fetchCachedChecklist();
-      if (cached.checklist && cached.version) {
-        store.setChecklistData(cached.checklist, cached.version);
-        if (profile?.site_code) {
-          store.setDriverInfo({ site: profile.site_code });
+          if (isResuming) {
+            await applyDraftFromIndexedDB();
+          } else {
+            if (profile?.site_code) {
+              store.setDriverInfo({ site: profile.site_code });
+            }
+            store.setFormStarted();
+          }
+          return;
         }
-        store.setFormStarted();
-        store.setLoading(false);
-        return;
-      }
 
-      // Both failed
-      store.setLoadError(error ?? 'Failed to load checklist — no cached version available');
-      store.setLoading(false);
+        // Network failed — try offline cache
+        console.log('[CHECKLIST] Network fetch failed, trying cache…');
+        const cached = await fetchCachedChecklist();
+        if (cached.checklist && cached.version) {
+          store.setChecklistData(cached.checklist, cached.version);
+
+          if (isResuming) {
+            await applyDraftFromIndexedDB();
+          } else {
+            if (profile?.site_code) {
+              store.setDriverInfo({ site: profile.site_code });
+            }
+            store.setFormStarted();
+          }
+          return;
+        }
+
+        // Both failed
+        store.setLoadError(error ?? 'Failed to load checklist — no cached version available');
+      } catch (err) {
+        console.error('[CHECKLIST] Unexpected error loading checklist:', err);
+        store.setLoadError('Unexpected error loading checklist');
+      } finally {
+        store.setLoading(false);
+      }
+    };
+
+    /** Load draft from IndexedDB and apply it to the store (after setChecklistData). */
+    const applyDraftFromIndexedDB = async () => {
+      try {
+        const draft = await getDraft();
+        if (!draft) {
+          console.warn('[CHECKLIST] Resume flag set but no draft found in IndexedDB');
+          store.setFormStarted();
+          return;
+        }
+
+        console.log('[CHECKLIST] Applying draft from IndexedDB…');
+
+        // Re-apply driver/vehicle info
+        store.setDriverInfo({ ...draft.driverInfo });
+        store.setVehicleInfo({ ...draft.vehicleInfo });
+
+        // Re-apply responses over the defaults setChecklistData created
+        for (const r of draft.responses) {
+          store.setResponse(r.itemId, r.fieldType, {
+            itemId: r.itemId,
+            fieldType: r.fieldType,
+            valueBoolean: r.valueBoolean,
+            valueText: r.valueText,
+            valueNumber: r.valueNumber,
+            valueImageUrl: r.valueImageUrl,
+          });
+        }
+
+        // Restore vehicle photo previews from Blobs
+        for (const p of draft.vehiclePhotos) {
+          const previewUrl = URL.createObjectURL(p.blob);
+          store.setVehiclePhoto(p.photoType, null, previewUrl);
+        }
+
+        // Restore defects with image previews from Blobs
+        for (const d of draft.defects) {
+          store.addDefect({
+            id: d.id,
+            details: d.details,
+            imageUrl: d.imageBlob ? URL.createObjectURL(d.imageBlob) : null,
+            imageFile: null,
+          });
+        }
+
+        // Restore timestamps and step
+        if (draft.tsFormStarted) {
+          // Manually set — setFormStarted() would overwrite with "now"
+          useChecklistStore.setState({ tsFormStarted: draft.tsFormStarted });
+        }
+        if (draft.tsFormReviewed) {
+          useChecklistStore.setState({ tsFormReviewed: draft.tsFormReviewed });
+        }
+        store.setCurrentStep(draft.currentStep);
+
+        console.log('[CHECKLIST] Draft applied successfully');
+      } catch (err) {
+        console.error('[CHECKLIST] Failed to apply draft:', err);
+        // Fall back to fresh form
+        store.setFormStarted();
+      }
     };
 
     load();
@@ -240,8 +335,9 @@ export function NewChecklistPage() {
       }
 
       // ── Step 3: Upload vehicle photos (all in parallel via raw fetch) ──
+      // Include photos that have either a File OR a previewUrl (draft-restored photos)
       const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
-        ([, pd]) => pd.file != null
+        ([, pd]) => pd.file != null || pd.previewUrl != null
       );
       console.log('[SUBMIT] Step 3:', photoEntries.length, 'photos (parallel raw fetch)');
       setSubmitProgress(`Step 3/5: Uploading ${photoEntries.length} photos…`);
@@ -249,10 +345,18 @@ export function NewChecklistPage() {
       // Compress all photos first (CPU-bound, fast)
       const compressedPhotos = await Promise.all(
         photoEntries.map(async ([photoType, photoData]) => {
-          if (!photoData.file) return null;
           try {
-            const compressed = await compressImage(photoData.file);
-            console.log(`[SUBMIT] Compressed ${photoType}: ${(photoData.file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
+            // Resolve the file — either from the File object or from the object URL (draft-restored)
+            let file: File;
+            if (photoData.file) {
+              file = photoData.file;
+            } else if (photoData.previewUrl) {
+              file = await blobUrlToFile(photoData.previewUrl, `${photoType}.jpg`);
+            } else {
+              return null;
+            }
+            const compressed = await compressImage(file);
+            console.log(`[SUBMIT] Compressed ${photoType}: ${(file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
             return { photoType, compressed };
           } catch {
             console.error(`[SUBMIT] Compression failed for ${photoType}`);
@@ -332,10 +436,18 @@ export function NewChecklistPage() {
         const defect = store.defects[i];
         let defectImageUrl: string | null = null;
 
-        if (defect.imageFile) {
+        // Resolve defect image: either from File or from object URL (draft-restored)
+        const hasDefectImage = defect.imageFile || defect.imageUrl;
+        if (hasDefectImage) {
           setSubmitProgress(`Step 4/5: Defect photo ${i + 1}…`);
           try {
-            const compressed = await compressImage(defect.imageFile);
+            let file: File;
+            if (defect.imageFile) {
+              file = defect.imageFile;
+            } else {
+              file = await blobUrlToFile(defect.imageUrl!, `defect_${i + 1}.jpg`);
+            }
+            const compressed = await compressImage(file);
             const filePath = `${submissionId}/defect_${i + 1}.jpg`;
             const storageUrl = `${SUPABASE_URL}/storage/v1/object/defect-photos/${filePath}`;
 
@@ -392,6 +504,10 @@ export function NewChecklistPage() {
       // ── Step 5: Done ──
       setSubmitProgress('Complete!');
       console.log('[SUBMIT] All done — navigating home');
+
+      // Clean up any saved draft
+      try { await deleteDraft(); } catch { /* non-fatal */ }
+
       store.resetForm();
       navigate('/', { replace: true });
     } catch (err: unknown) {
@@ -444,23 +560,30 @@ export function NewChecklistPage() {
       console.warn('[SUBMIT] GPS unavailable for offline save');
     }
 
-    // Compress photos and collect as blobs
+    // Compress photos and collect as blobs (handle draft-restored photos with previewUrl only)
     const photos: PendingPhoto[] = [];
     const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
-      ([, pd]) => pd.file != null
+      ([, pd]) => pd.file != null || pd.previewUrl != null
     );
 
     for (const [photoType, photoData] of photoEntries) {
-      if (!photoData.file) continue;
       try {
-        const compressed = await compressImage(photoData.file);
+        let file: File;
+        if (photoData.file) {
+          file = photoData.file;
+        } else if (photoData.previewUrl) {
+          file = await blobUrlToFile(photoData.previewUrl, `${photoType}.jpg`);
+        } else {
+          continue;
+        }
+        const compressed = await compressImage(file);
         photos.push({ photoType, blob: compressed });
       } catch {
         console.error(`[SUBMIT] Compression failed for ${photoType}`);
       }
     }
 
-    // Collect defects with image blobs
+    // Collect defects with image blobs (handle draft-restored defects with imageUrl only)
     const defects: PendingDefect[] = [];
     for (let i = 0; i < store.defects.length; i++) {
       const d = store.defects[i];
@@ -470,6 +593,13 @@ export function NewChecklistPage() {
           imageBlob = await compressImage(d.imageFile);
         } catch {
           console.error(`[SUBMIT] Defect image compression failed (${i + 1})`);
+        }
+      } else if (d.imageUrl) {
+        try {
+          const file = await blobUrlToFile(d.imageUrl, `defect_${i + 1}.jpg`);
+          imageBlob = await compressImage(file);
+        } catch {
+          console.error(`[SUBMIT] Defect image fetch/compression failed (${i + 1})`);
         }
       }
       defects.push({
@@ -515,8 +645,96 @@ export function NewChecklistPage() {
     });
 
     console.log('[SUBMIT] Saved to offline queue');
+
+    // Draft is now a pending submission — clean up draft
+    try { await deleteDraft(); } catch { /* non-fatal */ }
+
     store.resetForm();
     navigate('/', { replace: true, state: { offlineSaved: true } });
+  };
+
+  /** Save the current form as a draft to IndexedDB so the user can resume later. */
+  const handleSaveDraft = async () => {
+    if (!store.version || !profile) return;
+
+    setIsSavingDraft(true);
+    setSubmitError(null);
+
+    try {
+      // Serialise responses Map → array
+      const responses: DraftResponse[] = Array.from(store.responses.values()).map((r) => ({
+        itemId: r.itemId,
+        fieldType: r.fieldType,
+        valueBoolean: r.valueBoolean,
+        valueText: r.valueText,
+        valueNumber: r.valueNumber,
+        valueImageUrl: r.valueImageUrl,
+      }));
+
+      // Compress vehicle photos → blobs
+      const vehiclePhotos: DraftPhoto[] = [];
+      for (const [photoType, pd] of store.vehiclePhotos.entries()) {
+        if (!pd.file && !pd.previewUrl) continue;
+        try {
+          let blob: Blob;
+          if (pd.file) {
+            blob = await compressImage(pd.file);
+          } else if (pd.previewUrl) {
+            // Photo restored from a previous draft (file is null, previewUrl is an object URL)
+            const res = await fetch(pd.previewUrl);
+            blob = await res.blob();
+          } else {
+            continue;
+          }
+          vehiclePhotos.push({ photoType, blob });
+        } catch {
+          console.error(`[DRAFT] Photo compression failed for ${photoType}`);
+        }
+      }
+
+      // Compress defect images → blobs
+      const defects: DraftDefect[] = [];
+      for (const d of store.defects) {
+        let imageBlob: Blob | null = null;
+        if (d.imageFile) {
+          try {
+            imageBlob = await compressImage(d.imageFile);
+          } catch {
+            console.error(`[DRAFT] Defect image compression failed`);
+          }
+        } else if (d.imageUrl) {
+          try {
+            const res = await fetch(d.imageUrl);
+            imageBlob = await res.blob();
+          } catch {
+            console.error(`[DRAFT] Defect image fetch failed`);
+          }
+        }
+        defects.push({ id: d.id, details: d.details, imageBlob });
+      }
+
+      await saveDraft({
+        userId: profile.id,
+        checklistVersionId: store.version.id,
+        currentStep: store.currentStep,
+        driverInfo: { ...store.driverInfo },
+        vehicleInfo: { ...store.vehicleInfo },
+        responses,
+        vehiclePhotos,
+        defects,
+        tsFormStarted: store.tsFormStarted,
+        tsFormReviewed: store.tsFormReviewed,
+      });
+
+      console.log('[DRAFT] Saved successfully');
+      store.resetForm();
+      navigate('/', { replace: true, state: { draftSaved: true } });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSubmitError(`Failed to save draft: ${msg}`);
+    } finally {
+      setIsSavingDraft(false);
+    }
   };
 
   // Loading state
@@ -638,6 +856,8 @@ export function NewChecklistPage() {
           submitError={submitError}
           onSubmit={handleSubmit}
           onBack={() => goToStep('defects')}
+          onSaveDraft={handleSaveDraft}
+          isSavingDraft={isSavingDraft}
         />
       )}
     </div>

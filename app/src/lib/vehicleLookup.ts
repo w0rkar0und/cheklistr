@@ -12,9 +12,10 @@ export interface VehicleLookupResult {
  * Look up vehicle make, model and colour from VRM
  * via the server-side UKVD Edge Function.
  *
- * Uses raw fetch with an explicit auth token (same pattern as the
- * submission flow) because supabase.functions.invoke() can fail to
- * attach the session token in Capacitor WebView environments.
+ * Uses raw fetch with an explicit auth token because
+ * supabase.functions.invoke() can fail to attach the session
+ * token in Capacitor WebView environments, and can also hang
+ * when the JS client's auth session is mid-refresh.
  */
 export async function lookupVehicle(vrm: string): Promise<VehicleLookupResult> {
   try {
@@ -27,8 +28,8 @@ export async function lookupVehicle(vrm: string): Promise<VehicleLookupResult> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
         'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ vrm }),
     });
@@ -47,6 +48,7 @@ export async function lookupVehicle(vrm: string): Promise<VehicleLookupResult> {
     const data = await res.json();
     return data as VehicleLookupResult;
   } catch (err) {
+    console.error('[VRM] Lookup exception:', err);
     return {
       found: false,
       make: null,

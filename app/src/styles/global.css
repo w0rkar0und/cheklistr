@@ -1956,6 +1956,63 @@ button:disabled {
 }
 
 /* ==========================================
+   DRAFT CARD - HOME PAGE
+   ========================================== */
+
+.draft-card {
+  background: #FFF7ED;
+  border: 1px solid #FB923C;
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.draft-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.draft-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #FFEDD5;
+  color: #C2410C;
+  border: 1px solid #FB923C;
+}
+
+.draft-vrm {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-primary);
+}
+
+.draft-card-details {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.draft-card-meta {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.draft-card-actions {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-end;
+}
+
+/* ==========================================
    SYNC PROGRESS
    ========================================== */
 
