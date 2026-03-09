@@ -20,7 +20,6 @@ export async function checkBiometricAvailability(): Promise<BiometricAvailabilit
   }
 
   try {
-    await BiometricAuth.checkBiometry();
     const result = await BiometricAuth.checkBiometry();
 
     const typeMap: Record<number, string> = {

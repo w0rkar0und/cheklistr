@@ -18,7 +18,7 @@ import {
   setBiometricEnrolled,
   getBiometricUserId,
 } from '../../lib/secureStorage';
-import { supabase } from '../../lib/supabase';
+import { getAccessTokenFromStorage, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/supabase';
 
 type LoginView = 'loading' | 'biometric' | 'credentials' | 'enrolling';
 
@@ -180,11 +180,25 @@ export function LoginPage() {
       console.error('Session creation warning:', sessionError);
     }
 
-    // Update store
+    // Update store — use raw fetch to get the auth user instead of
+    // supabase.auth.getUser() which can hang in Capacitor WebView
     const store = useAuthStore.getState();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (authUser) {
-      store.setAuthUser(authUser);
+    try {
+      const accessToken = getAccessTokenFromStorage();
+      if (accessToken) {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+        if (res.ok) {
+          const authUser = await res.json();
+          store.setAuthUser(authUser);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch auth user (non-critical):', err);
     }
     store.setProfile(userProfile);
     if (appSession) {
