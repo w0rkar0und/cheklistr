@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { useChecklistStore } from '../../stores/checklistStore';
+// useChecklistStore not needed here — draft is loaded in NewChecklistPage from IndexedDB
 import { signOut } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { getPendingCount, getDraft, deleteDraft } from '../../lib/offlineDb';
@@ -83,8 +83,7 @@ export function HomePage() {
 
   const handleResumeDraft = () => {
     if (!draft) return;
-    // Load draft data into the Zustand store
-    useChecklistStore.getState().loadFromDraft(draft);
+    // Navigate to form — NewChecklistPage will load draft directly from IndexedDB
     navigate('/checklist/new', { state: { resumedDraft: true } });
   };
 

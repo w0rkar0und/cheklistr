@@ -10,7 +10,7 @@ import { DefectsStep } from '../../components/checklist/DefectsStep';
 import { ReviewStep } from '../../components/checklist/ReviewStep';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
-import { savePendingSubmission, getPendingCount, saveDraft, deleteDraft } from '../../lib/offlineDb';
+import { savePendingSubmission, getPendingCount, saveDraft, deleteDraft, getDraft } from '../../lib/offlineDb';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { ResponseValue } from '../../stores/checklistStore';
 import type { PendingPhoto, PendingDefect, PendingResponse, DraftResponse, DraftPhoto, DraftDefect } from '../../lib/offlineDb';
@@ -41,8 +41,8 @@ export function NewChecklistPage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   // Load the active checklist on mount (with offline fallback).
-  // If resuming a draft, the store is already populated via loadFromDraft() —
-  // we fetch checklist metadata for section rendering, then re-apply draft data.
+  // If resuming a draft, we load it directly from IndexedDB (not the store)
+  // so there's no race condition with store resets or React strict-mode re-mounts.
   useEffect(() => {
     const locState = location.state as { resumedDraft?: boolean } | null;
     const isResuming = locState?.resumedDraft === true;
@@ -52,83 +52,114 @@ export function NewChecklistPage() {
       window.history.replaceState({}, '');
     }
 
-    // If resuming, snapshot the draft data before setChecklistData overwrites it
-    const draftSnapshot = isResuming
-      ? {
-          driverInfo: { ...store.driverInfo },
-          vehicleInfo: { ...store.vehicleInfo },
-          responses: new Map(store.responses),
-          vehiclePhotos: new Map(store.vehiclePhotos),
-          defects: [...store.defects],
-          currentStep: store.currentStep,
-          tsFormStarted: store.tsFormStarted,
-          tsFormReviewed: store.tsFormReviewed,
-        }
-      : null;
-
     const load = async () => {
       store.setLoading(true);
       store.setLoadError(null);
 
-      // Try network first
-      const { checklist, version, error } = await fetchActiveChecklist();
-      if (!error && checklist && version) {
-        store.setChecklistData(checklist, version); // resets responses to defaults
-        if (isResuming && draftSnapshot) {
-          // Re-apply draft data over the fresh defaults
-          store.setDriverInfo(draftSnapshot.driverInfo);
-          store.setVehicleInfo(draftSnapshot.vehicleInfo);
-          for (const [itemId, resp] of draftSnapshot.responses) {
-            store.setResponse(itemId, resp.fieldType, resp);
-          }
-          for (const [photoType, pd] of draftSnapshot.vehiclePhotos) {
-            store.setVehiclePhoto(photoType, pd.file, pd.previewUrl);
-          }
-          for (const d of draftSnapshot.defects) {
-            store.addDefect(d);
-          }
-          store.setCurrentStep(draftSnapshot.currentStep);
-        } else {
-          if (profile?.site_code) {
-            store.setDriverInfo({ site: profile.site_code });
-          }
-          store.setFormStarted();
-        }
-        store.setLoading(false);
-        return;
-      }
+      try {
+        // Try network first
+        const { checklist, version, error } = await fetchActiveChecklist();
+        if (!error && checklist && version) {
+          store.setChecklistData(checklist, version); // resets responses to defaults
 
-      // Network failed — try offline cache
-      console.log('[CHECKLIST] Network fetch failed, trying cache…');
-      const cached = await fetchCachedChecklist();
-      if (cached.checklist && cached.version) {
-        store.setChecklistData(cached.checklist, cached.version);
-        if (isResuming && draftSnapshot) {
-          store.setDriverInfo(draftSnapshot.driverInfo);
-          store.setVehicleInfo(draftSnapshot.vehicleInfo);
-          for (const [itemId, resp] of draftSnapshot.responses) {
-            store.setResponse(itemId, resp.fieldType, resp);
+          if (isResuming) {
+            await applyDraftFromIndexedDB();
+          } else {
+            if (profile?.site_code) {
+              store.setDriverInfo({ site: profile.site_code });
+            }
+            store.setFormStarted();
           }
-          for (const [photoType, pd] of draftSnapshot.vehiclePhotos) {
-            store.setVehiclePhoto(photoType, pd.file, pd.previewUrl);
-          }
-          for (const d of draftSnapshot.defects) {
-            store.addDefect(d);
-          }
-          store.setCurrentStep(draftSnapshot.currentStep);
-        } else {
-          if (profile?.site_code) {
-            store.setDriverInfo({ site: profile.site_code });
-          }
-          store.setFormStarted();
+          return;
         }
-        store.setLoading(false);
-        return;
-      }
 
-      // Both failed
-      store.setLoadError(error ?? 'Failed to load checklist — no cached version available');
-      store.setLoading(false);
+        // Network failed — try offline cache
+        console.log('[CHECKLIST] Network fetch failed, trying cache…');
+        const cached = await fetchCachedChecklist();
+        if (cached.checklist && cached.version) {
+          store.setChecklistData(cached.checklist, cached.version);
+
+          if (isResuming) {
+            await applyDraftFromIndexedDB();
+          } else {
+            if (profile?.site_code) {
+              store.setDriverInfo({ site: profile.site_code });
+            }
+            store.setFormStarted();
+          }
+          return;
+        }
+
+        // Both failed
+        store.setLoadError(error ?? 'Failed to load checklist — no cached version available');
+      } catch (err) {
+        console.error('[CHECKLIST] Unexpected error loading checklist:', err);
+        store.setLoadError('Unexpected error loading checklist');
+      } finally {
+        store.setLoading(false);
+      }
+    };
+
+    /** Load draft from IndexedDB and apply it to the store (after setChecklistData). */
+    const applyDraftFromIndexedDB = async () => {
+      try {
+        const draft = await getDraft();
+        if (!draft) {
+          console.warn('[CHECKLIST] Resume flag set but no draft found in IndexedDB');
+          store.setFormStarted();
+          return;
+        }
+
+        console.log('[CHECKLIST] Applying draft from IndexedDB…');
+
+        // Re-apply driver/vehicle info
+        store.setDriverInfo({ ...draft.driverInfo });
+        store.setVehicleInfo({ ...draft.vehicleInfo });
+
+        // Re-apply responses over the defaults setChecklistData created
+        for (const r of draft.responses) {
+          store.setResponse(r.itemId, r.fieldType, {
+            itemId: r.itemId,
+            fieldType: r.fieldType,
+            valueBoolean: r.valueBoolean,
+            valueText: r.valueText,
+            valueNumber: r.valueNumber,
+            valueImageUrl: r.valueImageUrl,
+          });
+        }
+
+        // Restore vehicle photo previews from Blobs
+        for (const p of draft.vehiclePhotos) {
+          const previewUrl = URL.createObjectURL(p.blob);
+          store.setVehiclePhoto(p.photoType, null, previewUrl);
+        }
+
+        // Restore defects with image previews from Blobs
+        for (const d of draft.defects) {
+          store.addDefect({
+            id: d.id,
+            details: d.details,
+            imageUrl: d.imageBlob ? URL.createObjectURL(d.imageBlob) : null,
+            imageFile: null,
+          });
+        }
+
+        // Restore timestamps and step
+        if (draft.tsFormStarted) {
+          // Manually set — setFormStarted() would overwrite with "now"
+          useChecklistStore.setState({ tsFormStarted: draft.tsFormStarted });
+        }
+        if (draft.tsFormReviewed) {
+          useChecklistStore.setState({ tsFormReviewed: draft.tsFormReviewed });
+        }
+        store.setCurrentStep(draft.currentStep);
+
+        console.log('[CHECKLIST] Draft applied successfully');
+      } catch (err) {
+        console.error('[CHECKLIST] Failed to apply draft:', err);
+        // Fall back to fresh form
+        store.setFormStarted();
+      }
     };
 
     load();
