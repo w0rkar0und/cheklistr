@@ -6,32 +6,27 @@ import { test, expect } from '@playwright/test';
  * These tests verify that the fitImage() logic in generateSubmissionPdf.ts
  * correctly preserves aspect ratios for different image orientations.
  *
- * Since fitImage() is an internal function, we inject and evaluate
- * the same algorithm in the browser context.
+ * The fitImage function is evaluated inside page.evaluate() using an
+ * arrow function that declares and calls the function inline.
  */
-
-// The fitImage function from generateSubmissionPdf.ts (reproduced for in-page evaluation)
-const FIT_IMAGE_FN = `
-  function fitImage(img, maxW, maxH) {
-    const ratio = img.width / img.height;
-    let w = maxW;
-    let h = w / ratio;
-    if (h > maxH) {
-      h = maxH;
-      w = h * ratio;
-    }
-    return { w, h };
-  }
-`;
 
 test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('landscape image fits within bounds preserving ratio', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1920, height: 1080 }, 80, 60);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1920, height: 1080 }, 80, 60);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -49,10 +44,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('portrait image fits within bounds preserving ratio', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1080, height: 1920 }, 80, 100);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1080, height: 1920 }, 80, 100);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -71,10 +75,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('square image fits correctly', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1000, height: 1000 }, 80, 100);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1000, height: 1000 }, 80, 100);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -86,10 +99,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('square image with smaller maxH constrains by height', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1000, height: 1000 }, 80, 60);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1000, height: 1000 }, 80, 60);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -101,10 +123,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('image already smaller than max dimensions uses maxW', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 200, height: 100 }, 80, 100);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 200, height: 100 }, 80, 100);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -116,10 +147,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('very wide panoramic image respects width constraint', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 4000, height: 500 }, 80, 100);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 4000, height: 500 }, 80, 100);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -132,10 +172,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('very tall image respects height constraint', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 500, height: 4000 }, 80, 100);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 500, height: 4000 }, 80, 100);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -149,10 +198,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
     await page.goto('/');
 
     // Defect photos use fitImage(imgData, 60, 80)
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1080, height: 1920 }, 60, 80);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1080, height: 1920 }, 60, 80);
+    });
 
     const { w, h } = result as { w: number; h: number };
 
@@ -174,12 +232,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
     // Vehicle photos: cellW = (contentWidth - 6) / 2 ≈ 82mm, maxCellH = 100mm
     // contentWidth = 210 - 15*2 = 180, cellW = (180-6)/2 = 87
     const cellW = 87;
-    const result = await page.evaluate(
-      `
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1920, height: 1080 }, ${cellW}, 100);
-    `
-    );
+    const result = await page.evaluate((cw) => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1920, height: 1080 }, cw, 100);
+    }, cellW);
 
     const { w, h } = result as { w: number; h: number };
 
@@ -195,10 +260,19 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
   test('width and height are always positive', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(`
-      ${FIT_IMAGE_FN}
-      fitImage({ width: 1, height: 1 }, 80, 100);
-    `);
+    const result = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
+      return fitImage({ width: 1, height: 1 }, 80, 100);
+    });
 
     const { w, h } = result as { w: number; h: number };
     expect(w).toBeGreaterThan(0);
@@ -209,19 +283,28 @@ test.describe('PDF fitImage — Aspect Ratio Preservation', () => {
     await page.goto('/');
 
     // Test a range of ratios
-    const results = await page.evaluate(`
-      ${FIT_IMAGE_FN}
+    const results = await page.evaluate(() => {
+      function fitImage(img: { width: number; height: number }, maxW: number, maxH: number) {
+        const ratio = img.width / img.height;
+        let w = maxW;
+        let h = w / ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        return { w, h };
+      }
       const ratios = [
-        { width: 100, height: 100 },    // 1:1
-        { width: 1920, height: 1080 },   // 16:9
-        { width: 1080, height: 1920 },   // 9:16
-        { width: 4000, height: 500 },    // 8:1
-        { width: 500, height: 4000 },    // 1:8
-        { width: 3000, height: 2000 },   // 3:2
-        { width: 2000, height: 3000 },   // 2:3
+        { width: 100, height: 100 }, // 1:1
+        { width: 1920, height: 1080 }, // 16:9
+        { width: 1080, height: 1920 }, // 9:16
+        { width: 4000, height: 500 }, // 8:1
+        { width: 500, height: 4000 }, // 1:8
+        { width: 3000, height: 2000 }, // 3:2
+        { width: 2000, height: 3000 }, // 2:3
       ];
-      ratios.map(r => fitImage(r, 80, 100));
-    `);
+      return ratios.map((r) => fitImage(r, 80, 100));
+    });
 
     for (const r of results as { w: number; h: number }[]) {
       expect(r.w).toBeLessThanOrEqual(80 + 0.001);

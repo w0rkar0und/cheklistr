@@ -409,13 +409,13 @@ test.describe('Draft-Restored Photos', () => {
     const draft = (await getDraftFromIndexedDB(page)) as Record<string, unknown> | null;
     expect(draft).not.toBeNull();
 
-    // Photos should be serialised — either as blobs or base64
-    const photos = (draft as any).photos;
-    expect(photos).toBeTruthy();
+    // vehiclePhotos is a DraftPhoto[] array: { photoType: string; blob: Blob }
+    const vehiclePhotos = (draft as any).vehiclePhotos;
+    expect(vehiclePhotos).toBeTruthy();
+    expect(Array.isArray(vehiclePhotos)).toBe(true);
 
     // At least one photo entry should exist (we uploaded to all slots)
-    const photoKeys = Object.keys(photos);
-    expect(photoKeys.length).toBeGreaterThan(0);
+    expect(vehiclePhotos.length).toBeGreaterThan(0);
   });
 
   test('resumed draft shows photo previews on photos step', async ({ page, context }) => {
