@@ -27,6 +27,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 const STEPS = ['vehicle-info', 'photos', 'checklist', 'defects', 'review'] as const;
 
+/** Convert an object-URL (blob:…) to a File. Used for draft-restored photos where file is null. */
+async function blobUrlToFile(url: string, name: string): Promise<File> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new File([blob], name, { type: blob.type || 'image/jpeg' });
+}
+
 const MAX_PENDING = 10;
 
 export function NewChecklistPage() {
@@ -337,8 +344,9 @@ export function NewChecklistPage() {
       }
 
       // ── Step 3: Upload vehicle photos (all in parallel via raw fetch) ──
+      // Include photos that have either a File OR a previewUrl (draft-restored photos)
       const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
-        ([, pd]) => pd.file != null
+        ([, pd]) => pd.file != null || pd.previewUrl != null
       );
       console.log('[SUBMIT] Step 3:', photoEntries.length, 'photos (parallel raw fetch)');
       setSubmitProgress(`Step 3/5: Uploading ${photoEntries.length} photos…`);
@@ -346,10 +354,18 @@ export function NewChecklistPage() {
       // Compress all photos first (CPU-bound, fast)
       const compressedPhotos = await Promise.all(
         photoEntries.map(async ([photoType, photoData]) => {
-          if (!photoData.file) return null;
           try {
-            const compressed = await compressImage(photoData.file);
-            console.log(`[SUBMIT] Compressed ${photoType}: ${(photoData.file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
+            // Resolve the file — either from the File object or from the object URL (draft-restored)
+            let file: File;
+            if (photoData.file) {
+              file = photoData.file;
+            } else if (photoData.previewUrl) {
+              file = await blobUrlToFile(photoData.previewUrl, `${photoType}.jpg`);
+            } else {
+              return null;
+            }
+            const compressed = await compressImage(file);
+            console.log(`[SUBMIT] Compressed ${photoType}: ${(file.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`);
             return { photoType, compressed };
           } catch {
             console.error(`[SUBMIT] Compression failed for ${photoType}`);
@@ -429,10 +445,18 @@ export function NewChecklistPage() {
         const defect = store.defects[i];
         let defectImageUrl: string | null = null;
 
-        if (defect.imageFile) {
+        // Resolve defect image: either from File or from object URL (draft-restored)
+        const hasDefectImage = defect.imageFile || defect.imageUrl;
+        if (hasDefectImage) {
           setSubmitProgress(`Step 4/5: Defect photo ${i + 1}…`);
           try {
-            const compressed = await compressImage(defect.imageFile);
+            let file: File;
+            if (defect.imageFile) {
+              file = defect.imageFile;
+            } else {
+              file = await blobUrlToFile(defect.imageUrl!, `defect_${i + 1}.jpg`);
+            }
+            const compressed = await compressImage(file);
             const filePath = `${submissionId}/defect_${i + 1}.jpg`;
             const storageUrl = `${SUPABASE_URL}/storage/v1/object/defect-photos/${filePath}`;
 
@@ -555,23 +579,30 @@ export function NewChecklistPage() {
       console.warn('[SUBMIT] GPS unavailable for offline save');
     }
 
-    // Compress photos and collect as blobs
+    // Compress photos and collect as blobs (handle draft-restored photos with previewUrl only)
     const photos: PendingPhoto[] = [];
     const photoEntries = Array.from(store.vehiclePhotos.entries()).filter(
-      ([, pd]) => pd.file != null
+      ([, pd]) => pd.file != null || pd.previewUrl != null
     );
 
     for (const [photoType, photoData] of photoEntries) {
-      if (!photoData.file) continue;
       try {
-        const compressed = await compressImage(photoData.file);
+        let file: File;
+        if (photoData.file) {
+          file = photoData.file;
+        } else if (photoData.previewUrl) {
+          file = await blobUrlToFile(photoData.previewUrl, `${photoType}.jpg`);
+        } else {
+          continue;
+        }
+        const compressed = await compressImage(file);
         photos.push({ photoType, blob: compressed });
       } catch {
         console.error(`[SUBMIT] Compression failed for ${photoType}`);
       }
     }
 
-    // Collect defects with image blobs
+    // Collect defects with image blobs (handle draft-restored defects with imageUrl only)
     const defects: PendingDefect[] = [];
     for (let i = 0; i < store.defects.length; i++) {
       const d = store.defects[i];
@@ -581,6 +612,13 @@ export function NewChecklistPage() {
           imageBlob = await compressImage(d.imageFile);
         } catch {
           console.error(`[SUBMIT] Defect image compression failed (${i + 1})`);
+        }
+      } else if (d.imageUrl) {
+        try {
+          const file = await blobUrlToFile(d.imageUrl, `defect_${i + 1}.jpg`);
+          imageBlob = await compressImage(file);
+        } catch {
+          console.error(`[SUBMIT] Defect image fetch/compression failed (${i + 1})`);
         }
       }
       defects.push({
