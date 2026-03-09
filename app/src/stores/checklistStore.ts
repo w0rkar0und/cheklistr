@@ -4,6 +4,7 @@ import type {
   FullChecklistVersion,
   FieldType,
 } from '../types/database';
+import type { DraftFormState } from '../lib/offlineDb';
 
 // ============================================================
 // Response value for each checklist item
@@ -101,6 +102,7 @@ interface ChecklistFormState {
   setLoading: (loading: boolean) => void;
   setLoadError: (error: string | null) => void;
   resetForm: () => void;
+  loadFromDraft: (draft: DraftFormState) => void;
 }
 
 const initialDriverInfo: DriverInfo = {
@@ -216,4 +218,47 @@ export const useChecklistStore = create<ChecklistFormState>((set) => ({
     isLoading: false,
     loadError: null,
   }),
+
+  loadFromDraft: (draft) => {
+    // Rebuild responses Map from serialised array
+    const responses = new Map<string, ResponseValue>();
+    for (const r of draft.responses) {
+      responses.set(r.itemId, {
+        itemId: r.itemId,
+        fieldType: r.fieldType,
+        valueBoolean: r.valueBoolean,
+        valueText: r.valueText,
+        valueNumber: r.valueNumber,
+        valueImageUrl: r.valueImageUrl,
+      });
+    }
+
+    // Rebuild vehiclePhotos Map from blobs → object URLs
+    const vehiclePhotos = new Map<string, { file: File | null; previewUrl: string | null }>();
+    for (const p of draft.vehiclePhotos) {
+      const previewUrl = URL.createObjectURL(p.blob);
+      vehiclePhotos.set(p.photoType, { file: null, previewUrl });
+    }
+
+    // Rebuild defects with blob → object URLs
+    const defects: DefectEntry[] = draft.defects.map((d) => ({
+      id: d.id,
+      details: d.details,
+      imageUrl: d.imageBlob ? URL.createObjectURL(d.imageBlob) : null,
+      imageFile: null,
+    }));
+
+    set({
+      currentStep: draft.currentStep,
+      driverInfo: { ...draft.driverInfo },
+      vehicleInfo: { ...draft.vehicleInfo },
+      responses,
+      vehiclePhotos,
+      defects,
+      tsFormStarted: draft.tsFormStarted,
+      tsFormReviewed: draft.tsFormReviewed,
+      isLoading: false,
+      loadError: null,
+    });
+  },
 }));

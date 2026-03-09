@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useChecklistStore } from '../../stores/checklistStore';
 import { signOut } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
-import { getPendingCount } from '../../lib/offlineDb';
+import { getPendingCount, getDraft, deleteDraft } from '../../lib/offlineDb';
+import type { DraftFormState } from '../../lib/offlineDb';
 import type { Submission } from '../../types/database';
 
 export function HomePage() {
@@ -15,19 +17,25 @@ export function HomePage() {
   const [loadingSubs, setLoadingSubs] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [offlineSavedMsg, setOfflineSavedMsg] = useState(false);
+  const [draftSavedMsg, setDraftSavedMsg] = useState(false);
+  const [draft, setDraft] = useState<DraftFormState | null>(null);
 
-  // Check for offline-saved navigation state
+  // Check for navigation state messages (offline-saved, draft-saved)
   useEffect(() => {
-    const state = location.state as { offlineSaved?: boolean } | null;
+    const state = location.state as { offlineSaved?: boolean; draftSaved?: boolean } | null;
     if (state?.offlineSaved) {
       setOfflineSavedMsg(true);
-      // Clear the state so it doesn't show again on refresh
       window.history.replaceState({}, '');
       setTimeout(() => setOfflineSavedMsg(false), 5000);
     }
+    if (state?.draftSaved) {
+      setDraftSavedMsg(true);
+      window.history.replaceState({}, '');
+      setTimeout(() => setDraftSavedMsg(false), 5000);
+    }
   }, [location.state]);
 
-  // Load pending submission count
+  // Load pending submission count and check for saved draft
   useEffect(() => {
     const loadPending = async () => {
       try {
@@ -37,7 +45,16 @@ export function HomePage() {
         // IndexedDB might not be available
       }
     };
+    const loadDraft = async () => {
+      try {
+        const saved = await getDraft();
+        setDraft(saved ?? null);
+      } catch {
+        // IndexedDB might not be available
+      }
+    };
     loadPending();
+    loadDraft();
   }, []);
 
   // Load recent submissions for this user
@@ -64,6 +81,22 @@ export function HomePage() {
     navigate('/checklist/new');
   };
 
+  const handleResumeDraft = () => {
+    if (!draft) return;
+    // Load draft data into the Zustand store
+    useChecklistStore.getState().loadFromDraft(draft);
+    navigate('/checklist/new', { state: { resumedDraft: true } });
+  };
+
+  const handleDiscardDraft = async () => {
+    try {
+      await deleteDraft();
+      setDraft(null);
+    } catch {
+      console.error('[HOME] Failed to delete draft');
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut(appSession?.id);
     useAuthStore.getState().reset();
@@ -84,6 +117,48 @@ export function HomePage() {
       {offlineSavedMsg && (
         <div className="success-message">
           Submission saved offline — sync when you have signal.
+        </div>
+      )}
+
+      {draftSavedMsg && (
+        <div className="success-message">
+          Draft saved — you can resume it anytime.
+        </div>
+      )}
+
+      {draft && (
+        <div className="draft-card">
+          <div className="draft-card-top">
+            <span className="draft-badge">Draft</span>
+            <span className="draft-vrm">
+              {draft.vehicleInfo.vehicleRegistration || 'No VRM'}
+            </span>
+          </div>
+          <div className="draft-card-details">
+            {draft.driverInfo.name && <span>{draft.driverInfo.name}</span>}
+            {draft.driverInfo.hrCode && (
+              <span className="td-secondary"> ({draft.driverInfo.hrCode})</span>
+            )}
+          </div>
+          <div className="draft-card-meta">
+            <span>
+              Saved {new Date(draft.savedAt).toLocaleString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+          </div>
+          <div className="draft-card-actions">
+            <button className="btn-primary btn-small" onClick={handleResumeDraft}>
+              Resume
+            </button>
+            <button className="btn-danger btn-small" onClick={handleDiscardDraft}>
+              Discard
+            </button>
+          </div>
         </div>
       )}
 

@@ -15,6 +15,8 @@ interface ReviewStepProps {
   submitError?: string | null;
   onSubmit: () => void;
   onBack: () => void;
+  onSaveDraft: () => void;
+  isSavingDraft: boolean;
 }
 
 export function ReviewStep({
@@ -31,6 +33,8 @@ export function ReviewStep({
   submitError,
   onSubmit,
   onBack,
+  onSaveDraft,
+  isSavingDraft,
 }: ReviewStepProps) {
   const photoCount = Array.from(vehiclePhotos.values()).filter((p) => p.file != null).length;
 
@@ -161,14 +165,22 @@ export function ReviewStep({
 
       {/* Actions */}
       <div className="form-step-actions">
-        <button type="button" className="btn-secondary" onClick={onBack} disabled={isSubmitting}>
+        <button type="button" className="btn-secondary" onClick={onBack} disabled={isSubmitting || isSavingDraft}>
           Back (resets review time)
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={onSaveDraft}
+          disabled={isSubmitting || isSavingDraft}
+        >
+          {isSavingDraft ? 'Saving…' : 'Save Draft'}
         </button>
         <button
           type="button"
           className="btn-primary btn-large btn-submit"
           onClick={onSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isSavingDraft}
         >
           {isSubmitting ? (submitProgress || 'Submitting…') : 'Submit Inspection'}
         </button>
