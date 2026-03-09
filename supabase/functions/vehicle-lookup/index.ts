@@ -4,8 +4,6 @@
 // keeping the API key server-side.
 // ============================================================
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 // Correct UKVD endpoint (uk1.ukvehicledata.co.uk)
 const UKVD_BASE = 'https://uk1.ukvehicledata.co.uk/api/datapackage/VehicleData';
 
@@ -29,7 +27,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // 1. Verify the caller is authenticated
+    // 1. Verify the caller is authenticated via direct Auth API call.
+    //    We bypass the Supabase JS client entirely because getUser()
+    //    fails intermittently from Capacitor and mobile origins.
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('No Authorization header');
@@ -39,21 +39,20 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
-    // Extract the bare JWT from "Bearer <token>"
-    const token = authHeader.replace('Bearer ', '');
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
+    const authRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        'Authorization': authHeader,
+        'apikey': supabaseAnonKey,
+      },
     });
 
-    // Pass the token explicitly — the global-header approach fails
-    // when the request originates from a Capacitor WebView.
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      console.error('Auth error:', authError?.message ?? 'No user');
+    if (!authRes.ok) {
+      const authBody = await authRes.text();
+      console.error('Auth verification failed:', authRes.status, authBody);
       return jsonResponse({ error: 'Unauthorised' }, 401);
     }
 
+    const user = await authRes.json();
     console.log('Authenticated user:', user.id);
 
     // 2. Parse the VRM from the request body
