@@ -24,25 +24,49 @@ on:
       - 'app/package.json'
       - 'app/vercel.json'
 
-  # Manual trigger from GitHub Actions UI
+  # Manual trigger — pick a suite or run all
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - smoke
+          - checklist
+          - vrm
+          - pdf
+          - admin
+          - api
+      skip_vercel_wait:
+        description: 'Skip the 3-minute Vercel build wait (use when deployment is already live)'
+        required: false
+        default: false
+        type: boolean
+
+# ─── Suite → file mapping ──────────────────────────────────────
+# smoke:     login, home, navigation
+# checklist: checklist, draft, submission
+# vrm:       vrm-lookup
+# pdf:       pdf-aspect-ratio
+# admin:     admin, admin-checklists
+# api:       api-auth, api-data, api-rls
 
 # ─── Jobs ──────────────────────────────────────────────────────
 jobs:
-  e2e:
-    name: Playwright E2E
+  # ── Shared setup: install deps, save to cache ────────────────
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     defaults:
       run:
         working-directory: testing/e2e
-
     steps:
-      # 1. Check out the repo
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Set up Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -50,25 +74,23 @@ jobs:
           cache: 'npm'
           cache-dependency-path: testing/e2e/package-lock.json
 
-      # 3. Install npm dependencies
       - name: Install dependencies
         run: npm ci || npm install
 
-      # 4. Install Playwright browsers
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      # 5. Wait for Vercel deployment to complete
       - name: Wait for Vercel build
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: |
+          (github.event_name == 'push' || github.event_name == 'pull_request')
+          || (github.event_name == 'workflow_dispatch' && inputs.skip_vercel_wait != true)
         run: |
           echo "Waiting 3 minutes for Vercel deployment to complete…"
           sleep 180
 
-      # 6. Create .env from GitHub Secrets
       - name: Create .env file
         run: |
-          cat > .env << 'ENVEOF'
+          cat > .env << ENVEOF
           BASE_URL=${{ secrets.E2E_BASE_URL }}
           TEST_USER_ID=${{ secrets.E2E_TEST_USER_ID }}
           TEST_USER_PASSWORD=${{ secrets.E2E_TEST_USER_PASSWORD }}
@@ -76,24 +98,288 @@ jobs:
           ADMIN_USER_PASSWORD=${{ secrets.E2E_ADMIN_USER_PASSWORD }}
           ENVEOF
 
-      # 7. Run Playwright tests
-      - name: Run Playwright tests
-        run: npx playwright test
+      # Cache the entire working directory so suite jobs skip install
+      - name: Cache workspace
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
 
-      # 8. Upload HTML report as artifact (always, even on failure)
-      - name: Upload test report
+  # ── Smoke: login, home, navigation ───────────────────────────
+  smoke:
+    name: 'Suite: Smoke'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run smoke tests
+        run: npx playwright test login.spec.ts home.spec.ts navigation.spec.ts --project=chromium --project=mobile-chrome
+
+      - name: Upload report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-${{ github.run_number }}
+          name: report-smoke-${{ github.run_number }}
           path: testing/e2e/playwright-report/
           retention-days: 14
 
-      # 9. Upload failure screenshots/videos
-      - name: Upload test results on failure
+      - name: Upload failure artifacts
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: test-results-${{ github.run_number }}
+          name: results-smoke-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── Checklist: checklist, draft, submission ───────────────────
+  checklist:
+    name: 'Suite: Checklist'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'checklist'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run checklist tests
+        run: npx playwright test checklist.spec.ts draft.spec.ts submission.spec.ts --project=chromium --project=mobile-chrome
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-checklist-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-checklist-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── VRM: vrm-lookup ──────────────────────────────────────────
+  vrm:
+    name: 'Suite: VRM'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'vrm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run VRM tests
+        run: npx playwright test vrm-lookup.spec.ts --project=chromium --project=mobile-chrome
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-vrm-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-vrm-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── PDF: pdf-aspect-ratio ────────────────────────────────────
+  pdf:
+    name: 'Suite: PDF'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'pdf'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run PDF tests
+        run: npx playwright test pdf-aspect-ratio.spec.ts --project=chromium --project=mobile-chrome
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-pdf-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-pdf-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── Admin: admin, admin-checklists ───────────────────────────
+  admin:
+    name: 'Suite: Admin'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'admin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run admin tests
+        run: npx playwright test admin.spec.ts admin-checklists.spec.ts --project=admin-chromium
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-admin-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-admin-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── API: api-auth, api-data, api-rls ─────────────────────────
+  api:
+    name: 'Suite: API'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'api'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run API tests
+        run: npx playwright test api-auth.spec.ts api-data.spec.ts api-rls.spec.ts --project=api
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-api-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-api-${{ github.run_number }}
           path: testing/e2e/test-results/
           retention-days: 7
