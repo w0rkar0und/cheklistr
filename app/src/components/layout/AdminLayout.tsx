@@ -33,6 +33,9 @@ export function AdminLayout() {
           <NavLink to="/admin/checklists">Checklists</NavLink>
           <NavLink to="/admin/users">Users</NavLink>
           <NavLink to="/admin/sessions">Sessions</NavLink>
+          {profile?.role === 'super_admin' && (
+            <NavLink to="/admin/organisations">Organisations</NavLink>
+          )}
         </nav>
         {profile && (
           <div className="sidebar-footer">

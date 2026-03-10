@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const authStatePath = path.join(__dirname, 'test-results', '.auth', 'user.json');
 const adminAuthStatePath = path.join(__dirname, 'test-results', '.auth', 'admin.json');
+const superAdminAuthStatePath = path.join(__dirname, 'test-results', '.auth', 'super-admin.json');
 
 export default defineConfig({
   testDir: './tests',
@@ -34,13 +35,19 @@ export default defineConfig({
     // Auth setup — runs first and saves session state for other tests
     {
       name: 'auth-setup',
-      testMatch: /auth\.setup\.ts/,
+      testMatch: /\/auth\.setup\.ts$/,
     },
 
     // Admin auth setup — separate login for admin-only tests
     {
       name: 'admin-auth-setup',
-      testMatch: /admin-auth\.setup\.ts/,
+      testMatch: /admin-auth\.setup\.ts$/,
+    },
+
+    // Super admin auth setup — separate login for super_admin-only tests
+    {
+      name: 'super-admin-auth-setup',
+      testMatch: /super-admin-auth\.setup\.ts$/,
     },
 
     // Desktop Chrome tests (use saved auth state)
@@ -50,7 +57,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: authStatePath,
       },
-      testIgnore: /(admin|api-).*\.spec\.ts/,
+      testIgnore: /(admin|super-admin|api-).*\.spec\.ts/,
       dependencies: ['auth-setup'],
     },
 
@@ -61,7 +68,7 @@ export default defineConfig({
         ...devices['Pixel 7'],
         storageState: authStatePath,
       },
-      testIgnore: /(admin|api-).*\.spec\.ts/,
+      testIgnore: /(admin|super-admin|api-).*\.spec\.ts/,
       dependencies: ['auth-setup'],
     },
 
@@ -73,7 +80,21 @@ export default defineConfig({
         storageState: adminAuthStatePath,
       },
       testMatch: /admin(-\w+)?\.spec\.ts/,
+      testIgnore: /super-admin/,
       dependencies: ['admin-auth-setup'],
+    },
+
+    // Super admin tests — Desktop Chrome with super_admin session state
+    // Tests use test.use({ storageState }) per-describe to switch between
+    // super-admin and regular-admin auth as needed.
+    {
+      name: 'super-admin-chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: superAdminAuthStatePath,
+      },
+      testMatch: /super-admin\.spec\.ts/,
+      dependencies: ['super-admin-auth-setup', 'admin-auth-setup'],
     },
 
     // API tests — no browser needed, authenticate via Supabase REST API directly

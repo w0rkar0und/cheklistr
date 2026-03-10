@@ -41,6 +41,7 @@ on:
           - admin
           - api
           - multi-tenancy
+          - super-admin
       skip_vercel_wait:
         description: 'Skip the 3-minute Vercel build wait (use when deployment is already live)'
         required: false
@@ -64,6 +65,7 @@ on:
 # admin:           admin, admin-checklists
 # api:             api-auth, api-data, api-rls
 # multi-tenancy:   multi-tenancy
+# super-admin:     super-admin
 
 # ─── Jobs ──────────────────────────────────────────────────────
 jobs:
@@ -108,6 +110,8 @@ jobs:
           TEST_USER_PASSWORD=${{ secrets.E2E_TEST_USER_PASSWORD }}
           ADMIN_USER_ID=${{ secrets.E2E_ADMIN_USER_ID }}
           ADMIN_USER_PASSWORD=${{ secrets.E2E_ADMIN_USER_PASSWORD }}
+          SUPER_ADMIN_USER_ID=${{ secrets.E2E_SUPER_ADMIN_USER_ID }}
+          SUPER_ADMIN_USER_PASSWORD=${{ secrets.E2E_SUPER_ADMIN_USER_PASSWORD }}
           E2E_RETRIES=${{ github.event_name == 'workflow_dispatch' && inputs.retries || '1' }}
           ENVEOF
 
@@ -440,5 +444,51 @@ jobs:
         if: failure()
         with:
           name: results-multi-tenancy-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── Super Admin: organisations CRUD, cross-org user management ──
+  super-admin:
+    name: 'Suite: Super Admin'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'super-admin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run super admin tests
+        run: npx playwright test super-admin.spec.ts --project=super-admin-chromium
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-super-admin-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-super-admin-${{ github.run_number }}
           path: testing/e2e/test-results/
           retention-days: 7

@@ -11,6 +11,7 @@ import { AdminSubmissionDetail } from './pages/admin/AdminSubmissionDetail';
 import { AdminChecklists } from './pages/admin/AdminChecklists';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminSessions } from './pages/admin/AdminSessions';
+import { AdminOrganisations } from './pages/admin/AdminOrganisations';
 import { PendingSubmissionsPage } from './pages/checklist/PendingSubmissionsPage';
 
 export const router = createBrowserRouter([
@@ -76,6 +77,14 @@ export const router = createBrowserRouter([
       {
         path: 'sessions',
         element: <AdminSessions />,
+      },
+      {
+        path: 'organisations',
+        element: (
+          <ProtectedRoute requiredRole="super_admin">
+            <AdminOrganisations />
+          </ProtectedRoute>
+        ),
       },
     ],
   },

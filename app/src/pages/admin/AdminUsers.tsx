@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toSyntheticEmail } from '../../lib/auth';
 import { useAuthStore } from '../../stores/authStore';
-import type { User, UserRole } from '../../types/database';
+import type { User, UserRole, Organisation } from '../../types/database';
 
 interface NewUserForm {
   loginId: string;
@@ -11,6 +11,7 @@ interface NewUserForm {
   role: UserRole;
   contractorId: string;
   siteCode: string;
+  targetOrgId: string;
 }
 
 const emptyForm: NewUserForm = {
@@ -20,6 +21,7 @@ const emptyForm: NewUserForm = {
   role: 'site_manager',
   contractorId: '',
   siteCode: '',
+  targetOrgId: '',
 };
 
 export function AdminUsers() {
@@ -30,12 +32,55 @@ export function AdminUsers() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
 
+  // Super admin cross-org support
+  const [allOrgs, setAllOrgs] = useState<Organisation[]>([]);
+  const [filterOrgId, setFilterOrgId] = useState<string>('');
+
+  const profile = useAuthStore((s) => s.profile);
+  const organisation = useAuthStore((s) => s.organisation);
+  const isSuperAdmin = profile?.role === 'super_admin';
+
+  // Load organisations for super admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      supabase
+        .from('organisations')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+        .then(({ data }) => {
+          if (data) setAllOrgs(data as Organisation[]);
+        });
+    }
+  }, [isSuperAdmin]);
+
+  // Set default org filter and form target once orgs load
+  useEffect(() => {
+    if (isSuperAdmin && allOrgs.length > 0 && !filterOrgId) {
+      // Default to current org
+      const currentOrgId = organisation?.id || allOrgs[0].id;
+      setFilterOrgId(currentOrgId);
+      setForm((prev) => ({ ...prev, targetOrgId: currentOrgId }));
+    } else if (!isSuperAdmin && organisation) {
+      setFilterOrgId(organisation.id);
+      setForm((prev) => ({ ...prev, targetOrgId: organisation.id }));
+    }
+  }, [isSuperAdmin, allOrgs, organisation, filterOrgId]);
+
   const loadUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    let query = supabase
       .from('users')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // Super admin can filter by org; regular admin sees own org only (RLS enforced)
+    if (isSuperAdmin && filterOrgId) {
+      query = query.eq('org_id', filterOrgId);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setUsers(data as User[]);
@@ -44,8 +89,15 @@ export function AdminUsers() {
   };
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    if (filterOrgId || !isSuperAdmin) {
+      loadUsers();
+    }
+  }, [filterOrgId, isSuperAdmin]);
+
+  const getOrgSlugById = (orgId: string): string => {
+    const org = allOrgs.find((o) => o.id === orgId);
+    return org?.slug ?? organisation?.slug ?? '';
+  };
 
   const handleCreateUser = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,14 +112,26 @@ export function AdminUsers() {
       return;
     }
 
-    try {
-      // 0. Capture admin identity, org, and session BEFORE signUp() switches it
-      const adminId = useAuthStore.getState().profile?.id;
-      const adminOrg = useAuthStore.getState().organisation;
-      if (!adminId) throw new Error('Admin session not found');
-      if (!adminOrg) throw new Error('Organisation context not found');
+    const targetOrgId = isSuperAdmin ? form.targetOrgId : organisation?.id;
+    if (!targetOrgId) {
+      setFormError('No organisation selected');
+      setFormLoading(false);
+      return;
+    }
 
-      // Read session from localStorage — avoids supabase.auth.getSession() which hangs
+    const targetOrgSlug = isSuperAdmin ? getOrgSlugById(targetOrgId) : (organisation?.slug ?? '');
+    if (!targetOrgSlug) {
+      setFormError('Could not determine organisation slug');
+      setFormLoading(false);
+      return;
+    }
+
+    try {
+      // 0. Capture admin identity and session BEFORE signUp() switches it
+      const adminId = useAuthStore.getState().profile?.id;
+      if (!adminId) throw new Error('Admin session not found');
+
+      // Read session from localStorage
       const url = import.meta.env.VITE_SUPABASE_URL as string;
       const projectRef = new URL(url).hostname.split('.')[0];
       const storageKey = `sb-${projectRef}-auth-token`;
@@ -78,13 +142,11 @@ export function AdminUsers() {
         throw new Error('Admin auth session is incomplete');
       }
 
-      // 1. Suppress auth state listener — signUp() and setSession()
-      //    fire rapid SIGNED_IN events that would blow out the admin profile
+      // 1. Suppress auth state listener
       useAuthStore.getState().setSuppressAuthEvents(true);
 
       // 2. Create Supabase auth user with synthetic email
-      //    WARNING: This switches the active session to the new user
-      const syntheticEmail = toSyntheticEmail(loginId, adminOrg.slug);
+      const syntheticEmail = toSyntheticEmail(loginId, targetOrgSlug);
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: syntheticEmail,
@@ -95,26 +157,24 @@ export function AdminUsers() {
         throw new Error(authError?.message ?? 'Failed to create auth user');
       }
 
-      // 3. Immediately restore the admin session so RPC call works
+      // 3. Immediately restore the admin session
       await supabase.auth.setSession({
         access_token: adminSession.access_token,
         refresh_token: adminSession.refresh_token,
       });
 
-      // 4. Delay before re-enabling auth listener to let any queued
-      //    auth state events from setSession() flush through first
+      // 4. Delay before re-enabling auth listener
       await new Promise((resolve) => setTimeout(resolve, 500));
       useAuthStore.getState().setSuppressAuthEvents(false);
 
       // 5. Insert into users table via SECURITY DEFINER function
-      //    This bypasses RLS and verifies admin status internally
       const { error: rpcError } = await supabase.rpc('admin_create_user', {
         p_user_id: authData.user.id,
         p_login_id: loginId,
         p_full_name: form.fullName,
         p_email: syntheticEmail,
         p_role: form.role,
-        p_org_id: adminOrg.id,
+        p_org_id: targetOrgId,
         p_contractor_id: form.contractorId || null,
         p_site_code: form.siteCode || null,
         p_admin_id: adminId,
@@ -125,13 +185,12 @@ export function AdminUsers() {
       }
 
       // Reset and reload
-      setForm({ ...emptyForm });
+      setForm({ ...emptyForm, targetOrgId: filterOrgId });
       setShowForm(false);
       await loadUsers();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
-      // Always re-enable auth listener, even on error
       useAuthStore.getState().setSuppressAuthEvents(false);
       setFormLoading(false);
     }
@@ -160,12 +219,50 @@ export function AdminUsers() {
         </button>
       </div>
 
+      {/* Super admin org filter */}
+      {isSuperAdmin && allOrgs.length > 0 && (
+        <div className="admin-card" style={{ marginBottom: '1rem', padding: '0.75rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <label htmlFor="filter-org" style={{ fontWeight: 500, margin: 0, whiteSpace: 'nowrap' }}>
+              Organisation:
+            </label>
+            <select
+              id="filter-org"
+              value={filterOrgId}
+              onChange={(e) => setFilterOrgId(e.target.value)}
+              style={{ flex: 1 }}
+            >
+              {allOrgs.map((org) => (
+                <option key={org.id} value={org.id}>{org.name} ({org.slug})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Create User Form */}
       {showForm && (
         <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
           <h3>Create New User</h3>
           <form onSubmit={handleCreateUser}>
             {formError && <div className="error-message">{formError}</div>}
+
+            {/* Super admin: org selector for target org */}
+            {isSuperAdmin && allOrgs.length > 0 && (
+              <>
+                <label htmlFor="target-org">Target Organisation *</label>
+                <select
+                  id="target-org"
+                  value={form.targetOrgId}
+                  onChange={(e) => setForm({ ...form, targetOrgId: e.target.value })}
+                  required
+                >
+                  {allOrgs.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name} ({org.slug})</option>
+                  ))}
+                </select>
+              </>
+            )}
 
             <label htmlFor="new-login-id">User ID *</label>
             <input
@@ -205,6 +302,7 @@ export function AdminUsers() {
             >
               <option value="site_manager">Site Manager</option>
               <option value="admin">Admin</option>
+              {isSuperAdmin && <option value="super_admin">Super Admin</option>}
             </select>
 
             <label htmlFor="new-contractor">Contractor ID (HR Code)</label>
