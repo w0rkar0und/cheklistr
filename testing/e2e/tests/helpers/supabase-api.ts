@@ -18,7 +18,7 @@ export const TEST_ORG_SLUG = process.env.TEST_ORG_SLUG ?? 'greythorn';
 
 /**
  * Convert a user login ID + org slug to the synthetic email used by Supabase Auth.
- * Multi-tenancy format: `{loginId}.{orgSlug}@cheklistr.app`
+ * Format: `{loginId}.{orgSlug}@cheklistr.app`
  */
 export function toSyntheticEmail(loginId: string, orgSlug?: string): string {
   const slug = orgSlug ?? TEST_ORG_SLUG;
@@ -46,7 +46,7 @@ export async function getAccessToken(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Auth failed for ${loginId}@${orgSlug ?? TEST_ORG_SLUG} (${res.status}): ${body}`);
+    throw new Error(`Auth failed for ${email} (${res.status}): ${body}`);
   }
 
   const data = await res.json();

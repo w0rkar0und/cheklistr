@@ -17,7 +17,6 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD!;
 // ─── Authentication API ─────────────────────────────────────────
 test.describe('Supabase Auth API', () => {
   test('synthetic email mapping includes org slug', () => {
-    // Multi-tenancy format: {loginId}.{orgSlug}@cheklistr.app
     expect(toSyntheticEmail('X123456')).toBe(`x123456.${TEST_ORG_SLUG}@cheklistr.app`);
     expect(toSyntheticEmail('TestUser01')).toBe(`testuser01.${TEST_ORG_SLUG}@cheklistr.app`);
     expect(toSyntheticEmail('ADMIN')).toBe(`admin.${TEST_ORG_SLUG}@cheklistr.app`);
@@ -119,7 +118,7 @@ test.describe('Organisation Lookup API', () => {
   });
 
   test('org lookup works without authentication (anon access)', async () => {
-    // This verifies migration 015 — anon role can SELECT active organisations
+    // Verifies migration 015 — anon role can SELECT active organisations
     const { status } = await lookupOrganisation('greythorn');
     expect(status).toBe(200);
   });

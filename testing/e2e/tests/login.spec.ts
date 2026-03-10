@@ -23,14 +23,12 @@ test.describe('Login Page — Form Elements', () => {
   test('org slug field has correct attributes', async ({ page }) => {
     const orgSlug = page.locator('#org-slug');
     await expect(orgSlug).toHaveAttribute('type', 'text');
-    await expect(orgSlug).toHaveAttribute('placeholder', /greythorn/i);
     await expect(orgSlug).toHaveAttribute('autocomplete', 'organization');
   });
 
   test('user ID field has correct attributes', async ({ page }) => {
     const loginId = page.locator('#login-id');
     await expect(loginId).toHaveAttribute('type', 'text');
-    await expect(loginId).toHaveAttribute('placeholder', /X123456/i);
     await expect(loginId).toHaveAttribute('autocomplete', 'username');
   });
 

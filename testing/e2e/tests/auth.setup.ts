@@ -9,7 +9,7 @@ const authFile = path.join(authDir, 'user.json');
  * Authenticates as the test user and saves browser state (cookies, localStorage)
  * so all subsequent tests skip the login flow.
  *
- * Multi-tenancy: login now requires Organisation ID, User ID, and Password.
+ * Multi-tenancy: login requires Organisation ID, User ID, and Password.
  */
 setup('authenticate as test user', async ({ page }) => {
   const orgSlug = process.env.TEST_ORG_SLUG ?? 'greythorn';

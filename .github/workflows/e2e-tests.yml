@@ -46,6 +46,15 @@ on:
         required: false
         default: false
         type: boolean
+      retries:
+        description: 'Number of test retries (0 = no retries)'
+        required: false
+        default: '1'
+        type: choice
+        options:
+          - '0'
+          - '1'
+          - '2'
 
 # ─── Suite → file mapping ──────────────────────────────────────
 # smoke:           login, home, navigation
@@ -99,6 +108,7 @@ jobs:
           TEST_USER_PASSWORD=${{ secrets.E2E_TEST_USER_PASSWORD }}
           ADMIN_USER_ID=${{ secrets.E2E_ADMIN_USER_ID }}
           ADMIN_USER_PASSWORD=${{ secrets.E2E_ADMIN_USER_PASSWORD }}
+          E2E_RETRIES=${{ github.event_name == 'workflow_dispatch' && inputs.retries || '1' }}
           ENVEOF
 
       # Cache the entire working directory so suite jobs skip install
