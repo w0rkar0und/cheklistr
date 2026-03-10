@@ -274,13 +274,22 @@ test.describe('Storage Buckets', () => {
   });
 
   test('user can upload a test image to vehicle-photos', async () => {
+    // Migration 014 scoped storage paths to {org_id}/{submission_id}/{filename}.
+    // The INSERT policy requires get_path_org_id(name) = get_user_org_id().
+    const { data: users } = await supabaseGet('users', userToken, {
+      select: 'org_id',
+    });
+    const orgId = (users as any[])[0]?.org_id;
+    expect(orgId).toBeTruthy();
+
     // 1x1 red PNG
     const tinyPng = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
       'base64'
     );
 
-    const testPath = `test-uploads/api-test-${Date.now()}.png`;
+    const testSubmissionId = crypto.randomUUID();
+    const testPath = `${orgId}/${testSubmissionId}/api-test-${Date.now()}.png`;
 
     const res = await fetch(
       `${SUPABASE_URL}/storage/v1/object/vehicle-photos/${testPath}`,
