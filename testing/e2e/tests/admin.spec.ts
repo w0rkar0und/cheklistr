@@ -289,7 +289,17 @@ test.describe('Admin Users', () => {
     }
     expect(optionTexts).toContain('site manager');
     expect(optionTexts).toContain('admin');
-    expect(optionTexts).toContain('super admin');
+
+    // super_admin role — expected once multi-tenancy migration is complete
+    const hasSuperAdmin =
+      optionTexts.includes('super admin') || optionTexts.includes('super_admin');
+    if (!hasSuperAdmin) {
+      console.warn(
+        '[E2E] super_admin role not yet in dropdown — options found:',
+        optionTexts.join(', ')
+      );
+    }
+    expect(hasSuperAdmin).toBe(true);
   });
 
   test('users table or empty state is displayed', async ({ page }) => {

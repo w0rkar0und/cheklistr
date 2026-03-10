@@ -136,12 +136,14 @@ test.describe('Submission API', () => {
   });
 
   test('user can create a submission', async () => {
-    // Get the user's profile ID
+    // Get the user's profile ID and org_id
     const { data: users } = await supabaseGet('users', userToken, {
-      select: 'id',
+      select: 'id,org_id',
     });
     const userId = (users as any[])[0]?.id;
+    const orgId = (users as any[])[0]?.org_id;
     expect(userId).toBeTruthy();
+    expect(orgId).toBeTruthy();
 
     // Get active checklist version
     const { data: versions } = await supabaseGet('checklist_versions', userToken, {
@@ -156,6 +158,7 @@ test.describe('Submission API', () => {
     const { status, data } = await supabasePost('submissions', userToken, {
       id: testSubmissionId,
       user_id: userId,
+      org_id: orgId,
       checklist_version_id: versionId,
       status: 'submitted',
       vehicle_registration: `API${Date.now().toString(36).toUpperCase()}`,
@@ -197,11 +200,9 @@ test.describe('Submission API', () => {
   });
 
   test('admin can archive a submission', async () => {
-    // Get admin user ID
+    // Get admin user ID — may be 'admin' or 'super_admin' role
     const { data: adminUsers } = await supabaseGet('users', adminToken, {
       select: 'id',
-      role: 'eq.admin',
-      limit: '1',
     });
     const adminUserId = (adminUsers as any[])[0]?.id;
 
@@ -279,7 +280,14 @@ test.describe('Storage Buckets', () => {
       'base64'
     );
 
-    const testPath = `test-uploads/api-test-${Date.now()}.png`;
+    // Get the user's auth UID for the storage path (Supabase storage RLS
+    // policies typically scope uploads under the user's auth.uid folder)
+    const jwtPayload = JSON.parse(
+      Buffer.from(userToken.split('.')[1], 'base64').toString()
+    );
+    const authUid = jwtPayload.sub;
+
+    const testPath = `${authUid}/api-test-${Date.now()}.png`;
 
     const res = await fetch(
       `${SUPABASE_URL}/storage/v1/object/vehicle-photos/${testPath}`,

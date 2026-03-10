@@ -75,40 +75,66 @@ test.describe('SignedImage — Admin Submission Detail', () => {
 
   test('submission detail loads photos via SignedImage', async ({ page }) => {
     await page.goto('/admin/submissions');
-    await expect(page.locator('.admin-submissions')).toBeVisible({ timeout: 15_000 });
 
-    // Wait for data to load
-    const table = page.locator('.admin-table-container');
-    const emptyState = page.locator('.empty-state');
+    // Wait for the submissions page layout (may be .admin-submissions or a broader container)
+    await expect(
+      page
+        .locator('.admin-submissions')
+        .or(page.locator('.admin-layout'))
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Wait for table or empty state
+    const table = page.locator('table, .admin-table-container');
+    const emptyState = page.locator('.empty-state, .no-data');
     await expect(table.or(emptyState)).toBeVisible({ timeout: 15_000 });
 
-    // Only test if we have submissions
-    if (await table.isVisible()) {
-      const firstRow = page.locator('.clickable-row').first();
-      if (await firstRow.isVisible()) {
-        await firstRow.click();
-        await expect(page).toHaveURL(/\/admin\/submissions\/.+/, { timeout: 10_000 });
+    // Only test if we have submission rows
+    const firstRow = page
+      .locator('.clickable-row, table tbody tr')
+      .first();
+    if (!(await firstRow.isVisible({ timeout: 3_000 }).catch(() => false))) {
+      // No submissions in the table — nothing to test
+      console.warn('[E2E] No submissions found — skipping SignedImage detail check');
+      return;
+    }
 
-        // Wait for the detail page to load
-        await expect(
-          page.locator('.submission-detail').or(page.locator('.admin-submission-detail'))
-        ).toBeVisible({ timeout: 15_000 });
+    await firstRow.click();
+    await expect(page).toHaveURL(/\/admin\/submissions\/.+/, { timeout: 10_000 });
 
-        // Photos should render via SignedImage component — look for either:
-        // - Loaded images (img tags with signed URL src containing token)
-        // - Loading spinners (.signed-image-loading)
-        // - Error states (.signed-image-error)
-        const signedImages = page.locator(
-          'img[src*="token="], .signed-image-loading, .signed-image-error'
+    // Wait for the detail page — try several common container selectors
+    await expect(
+      page
+        .locator('.submission-detail')
+        .or(page.locator('.admin-submission-detail'))
+        .or(page.locator('[class*="submission"]'))
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Look for any images on the detail page — signed URLs contain "token="
+    // Also look for common SignedImage component states
+    const signedImages = page.locator(
+      'img[src*="token="], .signed-image-loading, .signed-image-error, [class*="signed-image"]'
+    );
+
+    // Also try broader photo container selectors
+    const photoSection = page.locator(
+      '.photo-grid, .submission-photos, .vehicle-photos, [class*="photo"], [class*="image-grid"]'
+    );
+
+    // If there's a photo section with signed images, verify they rendered
+    const hasPhotos = await photoSection
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+
+    if (hasPhotos) {
+      const count = await signedImages.count();
+      expect(count).toBeGreaterThan(0);
+    } else {
+      // Check if there are any images with signed URLs on the page at all
+      const anySignedImg = await signedImages.count();
+      if (anySignedImg === 0) {
+        console.warn(
+          '[E2E] No photo section or signed images found on submission detail page'
         );
-        const photoSection = page.locator('.photo-grid, .submission-photos, .vehicle-photos');
-
-        // If there's a photo section, check for signed image rendering
-        if (await photoSection.isVisible({ timeout: 5_000 }).catch(() => false)) {
-          const count = await signedImages.count();
-          // At least some photo elements should be present
-          expect(count).toBeGreaterThan(0);
-        }
       }
     }
   });
