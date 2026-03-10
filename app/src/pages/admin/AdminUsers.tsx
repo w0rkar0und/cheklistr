@@ -61,9 +61,11 @@ export function AdminUsers() {
     }
 
     try {
-      // 0. Capture admin identity and session BEFORE signUp() switches it
+      // 0. Capture admin identity, org, and session BEFORE signUp() switches it
       const adminId = useAuthStore.getState().profile?.id;
+      const adminOrg = useAuthStore.getState().organisation;
       if (!adminId) throw new Error('Admin session not found');
+      if (!adminOrg) throw new Error('Organisation context not found');
 
       // Read session from localStorage — avoids supabase.auth.getSession() which hangs
       const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -82,7 +84,7 @@ export function AdminUsers() {
 
       // 2. Create Supabase auth user with synthetic email
       //    WARNING: This switches the active session to the new user
-      const syntheticEmail = toSyntheticEmail(loginId);
+      const syntheticEmail = toSyntheticEmail(loginId, adminOrg.slug);
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: syntheticEmail,
@@ -112,6 +114,7 @@ export function AdminUsers() {
         p_full_name: form.fullName,
         p_email: syntheticEmail,
         p_role: form.role,
+        p_org_id: adminOrg.id,
         p_contractor_id: form.contractorId || null,
         p_site_code: form.siteCode || null,
         p_admin_id: adminId,
@@ -262,7 +265,7 @@ export function AdminUsers() {
                   <td>{user.full_name}</td>
                   <td>
                     <span className={`role-badge role-badge--${user.role}`}>
-                      {user.role === 'admin' ? 'Admin' : 'Site Manager'}
+                      {user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Site Manager'}
                     </span>
                   </td>
                   <td>{user.contractor_id ?? '—'}</td>

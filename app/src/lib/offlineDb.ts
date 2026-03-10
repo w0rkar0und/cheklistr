@@ -35,6 +35,7 @@ export interface PendingSubmission {
   id?: number; // Auto-increment key
   submissionId: string;
   userId: string;
+  orgId: string;
   checklistVersionId: string;
   vehicleRegistration: string;
   mileage: string;

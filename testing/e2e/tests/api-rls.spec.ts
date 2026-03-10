@@ -4,6 +4,7 @@ import {
   supabaseGet,
   supabasePost,
   supabaseAnonGet,
+  lookupOrganisation,
 } from './helpers/supabase-api';
 
 // These tests run without a browser — pure API calls
@@ -34,12 +35,28 @@ test.describe('RLS — Unauthenticated Access', () => {
     expect(data).toEqual([]);
   });
 
-  test('anon CAN read checklists (all authenticated users can)', async () => {
-    // Checklists may or may not be visible to anon depending on RLS
-    // The policy says "All authenticated users" — so anon should get empty
+  test('anon cannot read checklists (authenticated users only)', async () => {
     const { status, data } = await supabaseAnonGet('checklists', { select: '*' });
     expect(status).toBe(200);
     // Anon is not authenticated, so should get empty
+    expect(data).toEqual([]);
+  });
+
+  test('anon CAN read active organisations (migration 015)', async () => {
+    const { status, data } = await lookupOrganisation('greythorn');
+    expect(status).toBe(200);
+    expect(Array.isArray(data)).toBe(true);
+    expect((data as any[]).length).toBe(1);
+    expect((data as any[])[0].slug).toBe('greythorn');
+  });
+
+  test('anon cannot read inactive organisations', async () => {
+    // The RLS policy only allows is_active=true, so inactive orgs are invisible
+    const { status, data } = await supabaseAnonGet('organisations', {
+      select: 'id,slug',
+      is_active: 'eq.false',
+    });
+    expect(status).toBe(200);
     expect(data).toEqual([]);
   });
 });
@@ -54,11 +71,32 @@ test.describe('RLS — Site Manager Access', () => {
 
   test('user can read own profile', async () => {
     const { status, data } = await supabaseGet('users', userToken, {
-      select: 'id,login_id,role,full_name',
+      select: 'id,login_id,role,full_name,org_id',
     });
     expect(status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
     // User should see at least their own record
+    expect((data as any[]).length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('user profile includes org_id', async () => {
+    const { data } = await supabaseGet('users', userToken, {
+      select: 'org_id',
+    });
+    expect(Array.isArray(data)).toBe(true);
+    // Every user record should have a non-null org_id (migration 012 backfill)
+    for (const row of data as any[]) {
+      expect(row.org_id).toBeTruthy();
+    }
+  });
+
+  test('user can read own organisation', async () => {
+    const { status, data } = await supabaseGet('organisations', userToken, {
+      select: 'id,name,slug,is_active',
+    });
+    expect(status).toBe(200);
+    expect(Array.isArray(data)).toBe(true);
+    // User should see their own org
     expect((data as any[]).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -115,7 +153,7 @@ test.describe('RLS — Site Manager Access', () => {
 
   test('user can read own submissions', async () => {
     const { status, data } = await supabaseGet('submissions', userToken, {
-      select: 'id,vehicle_registration,status',
+      select: 'id,vehicle_registration,status,org_id',
     });
     expect(status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
@@ -133,7 +171,7 @@ test.describe('RLS — Site Manager Access', () => {
   });
 
   test('user cannot update other users', async () => {
-    // Try to update all users' names — RLS should limit to own record only
+    // Try to read all users — site_manager should only see themselves
     const { status, data } = await supabaseGet('users', userToken, {
       select: 'id,login_id',
     });
@@ -159,9 +197,9 @@ test.describe('RLS — Admin Access', () => {
     adminToken = await getAccessToken(ADMIN_USER_ID, ADMIN_USER_PASSWORD);
   });
 
-  test('admin can read all users', async () => {
+  test('admin can read all users within their org', async () => {
     const { status, data } = await supabaseGet('users', adminToken, {
-      select: 'id,login_id,role',
+      select: 'id,login_id,role,org_id',
     });
     expect(status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
@@ -169,9 +207,19 @@ test.describe('RLS — Admin Access', () => {
     expect((data as any[]).length).toBeGreaterThan(1);
   });
 
-  test('admin can read all submissions', async () => {
+  test('admin users all belong to same org', async () => {
+    const { data } = await supabaseGet('users', adminToken, {
+      select: 'org_id',
+    });
+    // All users visible to this admin should share the same org_id
+    const orgIds = new Set((data as any[]).map((u: any) => u.org_id));
+    // With org-scoped RLS, admin sees only their own org's users
+    expect(orgIds.size).toBe(1);
+  });
+
+  test('admin can read all submissions within their org', async () => {
     const { status, data } = await supabaseGet('submissions', adminToken, {
-      select: 'id,vehicle_registration,user_id,status',
+      select: 'id,vehicle_registration,user_id,status,org_id',
     });
     expect(status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
@@ -191,11 +239,11 @@ test.describe('RLS — Admin Access', () => {
     });
     const roles = new Set((data as any[]).map((u: any) => u.role));
     // Should have at least site_manager and admin roles
-    expect(roles.has('admin')).toBe(true);
+    expect(roles.has('admin') || roles.has('super_admin')).toBe(true);
   });
 });
 
-// ─── RLS: Cross-User Isolation ──────────────────────────────────
+// ─── RLS: Cross-User Data Isolation ──────────────────────────────
 test.describe('RLS — Cross-User Data Isolation', () => {
   let userToken: string;
   let adminToken: string;

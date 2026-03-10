@@ -1,9 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signIn, createAppSession, fetchUserProfile } from '../../lib/auth';
+import { signIn, createAppSession, fetchUserProfile, lookupOrganisation } from '../../lib/auth';
 import { useAuthStore } from '../../stores/authStore';
 
 export function LoginPage() {
+  const [orgSlug, setOrgSlug] = useState('');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +16,10 @@ export function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isInitialised && profile) {
-      navigate(profile.role === 'admin' ? '/admin' : '/', { replace: true });
+      const target = profile.role === 'admin' || profile.role === 'super_admin'
+        ? '/admin'
+        : '/';
+      navigate(target, { replace: true });
     }
   }, [isInitialised, profile, navigate]);
 
@@ -25,15 +29,23 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      // 1. Authenticate with Supabase (User ID → synthetic email internally)
-      const { data, error: signInError } = await signIn(loginId, password);
+      // 1. Validate organisation exists and is active
+      const { data: org, error: orgError } = await lookupOrganisation(orgSlug);
+      if (orgError || !org) {
+        setError('Organisation not found. Check the Organisation ID and try again.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Authenticate with Supabase (org slug + User ID → synthetic email internally)
+      const { data, error: signInError } = await signIn(loginId, orgSlug, password);
       if (signInError || !data.user) {
         setError('Invalid User ID or password');
         setLoading(false);
         return;
       }
 
-      // 2. Fetch user profile
+      // 3. Fetch user profile
       const { data: userProfile, error: profileError } = await fetchUserProfile(data.user.id);
       if (profileError || !userProfile) {
         setError('Unable to load your profile. Contact an administrator.');
@@ -41,28 +53,32 @@ export function LoginPage() {
         return;
       }
 
-      // 3. Check account is active
+      // 4. Check account is active
       if (!userProfile.is_active) {
         setError('Your account has been deactivated. Contact an administrator.');
         setLoading(false);
         return;
       }
 
-      // 4. Create app session (DB trigger terminates any existing sessions)
-      const { data: appSession, error: sessionError } = await createAppSession(data.user.id);
+      // 5. Create app session (DB trigger terminates any existing sessions)
+      const { data: appSession, error: sessionError } = await createAppSession(data.user.id, org.id);
       if (sessionError || !appSession) {
         console.error('Session creation warning:', sessionError);
       }
 
-      // 5. Update store
+      // 6. Update store
       useAuthStore.getState().setAuthUser(data.user);
       useAuthStore.getState().setProfile(userProfile);
+      useAuthStore.getState().setOrganisation(org);
       if (appSession) {
         useAuthStore.getState().setAppSession(appSession);
       }
 
-      // 6. Navigate based on role
-      navigate(userProfile.role === 'admin' ? '/admin' : '/', { replace: true });
+      // 7. Navigate based on role
+      const target = userProfile.role === 'admin' || userProfile.role === 'super_admin'
+        ? '/admin'
+        : '/';
+      navigate(target, { replace: true });
     } catch (err) {
       console.error('Login error:', err);
       setError('An unexpected error occurred. Please try again.');
@@ -81,6 +97,19 @@ export function LoginPage() {
           {error && (
             <div className="error-message">{error}</div>
           )}
+
+          <label htmlFor="org-slug">Organisation ID</label>
+          <input
+            id="org-slug"
+            type="text"
+            value={orgSlug}
+            onChange={(e) => setOrgSlug(e.target.value.toLowerCase().trim())}
+            placeholder="e.g. greythorn"
+            required
+            autoComplete="organization"
+            autoCapitalize="none"
+            disabled={loading}
+          />
 
           <label htmlFor="login-id">User ID</label>
           <input

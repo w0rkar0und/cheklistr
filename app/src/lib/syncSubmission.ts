@@ -6,6 +6,11 @@ import type { PendingSubmission } from './offlineDb';
 // Cheklistr: Sync Engine
 // Uploads a PendingSubmission from IndexedDB to Supabase,
 // replicating the same 5-step pipeline as NewChecklistPage.
+//
+// Multi-tenancy: org_id is included in the submission row,
+// and storage paths are org-prefixed: {orgId}/{submissionId}/{filename}
+// Photo records store the storage path (not a public URL) since
+// buckets are private — display uses signed URLs via SignedImage.
 // ============================================================
 
 /** Race a promise against a timeout. */
@@ -50,6 +55,7 @@ export async function syncSubmission(
 
     const submissionRow = {
       id: pending.submissionId,
+      org_id: pending.orgId,
       user_id: pending.userId,
       session_id: null,
       checklist_version_id: pending.checklistVersionId,
@@ -116,13 +122,14 @@ export async function syncSubmission(
     }
 
     // ── Step 3: Upload vehicle photos ──
+    // Storage path: {orgId}/{submissionId}/{photoType}.jpg
     onProgress?.({ step: '3/5', detail: `Uploading ${pending.photos.length} photos…` });
 
     let uploadedCount = 0;
     await Promise.all(
       pending.photos.map(async ({ photoType, blob }) => {
         try {
-          const filePath = `${pending.submissionId}/${photoType}.jpg`;
+          const filePath = `${pending.orgId}/${pending.submissionId}/${photoType}.jpg`;
           const storageUrl = `${SUPABASE_URL}/storage/v1/object/vehicle-photos/${filePath}`;
 
           const uploadRes = await withTimeout(
@@ -145,8 +152,7 @@ export async function syncSubmission(
             return;
           }
 
-          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/vehicle-photos/${filePath}`;
-
+          // Store the storage path (not a public URL) — buckets are private
           await withTimeout(
             fetch(`${SUPABASE_URL}/rest/v1/submission_photos`, {
               method: 'POST',
@@ -154,7 +160,7 @@ export async function syncSubmission(
               body: JSON.stringify({
                 submission_id: pending.submissionId,
                 photo_type: photoType,
-                storage_url: publicUrl,
+                storage_url: filePath,
               }),
             }),
             10000,
@@ -175,12 +181,12 @@ export async function syncSubmission(
 
     for (let i = 0; i < pending.defects.length; i++) {
       const defect = pending.defects[i];
-      let defectImageUrl: string | null = null;
+      let defectStoragePath: string | null = null;
 
       if (defect.imageBlob) {
         onProgress?.({ step: '4/5', detail: `Defect photo ${i + 1}…` });
         try {
-          const filePath = `${pending.submissionId}/defect_${defect.defectNumber}.jpg`;
+          const filePath = `${pending.orgId}/${pending.submissionId}/defect_${defect.defectNumber}.jpg`;
           const storageUrl = `${SUPABASE_URL}/storage/v1/object/defect-photos/${filePath}`;
 
           const upRes = await withTimeout(
@@ -198,7 +204,7 @@ export async function syncSubmission(
             `Defect photo ${i + 1}`
           );
           if (upRes.ok) {
-            defectImageUrl = `${SUPABASE_URL}/storage/v1/object/public/defect-photos/${filePath}`;
+            defectStoragePath = filePath;
           }
         } catch (err) {
           console.error(`[SYNC] Defect photo exception (${i + 1}):`, err);
@@ -213,7 +219,7 @@ export async function syncSubmission(
             body: JSON.stringify({
               submission_id: pending.submissionId,
               defect_number: defect.defectNumber,
-              image_url: defectImageUrl,
+              image_url: defectStoragePath,
               details: defect.details,
             }),
           }),

@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import type { User, Session } from '../types/database';
+import type { User, Session, Organisation } from '../types/database';
 
 interface AuthState {
   // Supabase auth user
   authUser: SupabaseUser | null;
   // Application user profile
   profile: User | null;
+  // Current organisation context
+  organisation: Organisation | null;
   // Current app session (2-hour expiry)
   appSession: Session | null;
   // Whether the app session has expired (triggers re-auth overlay)
@@ -22,6 +24,7 @@ interface AuthState {
   // Actions
   setAuthUser: (user: SupabaseUser | null) => void;
   setProfile: (profile: User | null) => void;
+  setOrganisation: (organisation: Organisation | null) => void;
   setAppSession: (session: Session | null) => void;
   setSessionExpired: (expired: boolean) => void;
   setLoading: (loading: boolean) => void;
@@ -33,6 +36,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   authUser: null,
   profile: null,
+  organisation: null,
   appSession: null,
   isSessionExpired: false,
   isLoading: true,
@@ -41,6 +45,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setAuthUser: (authUser) => set({ authUser }),
   setProfile: (profile) => set({ profile }),
+  setOrganisation: (organisation) => set({ organisation }),
   setAppSession: (appSession) => set({ appSession }),
   setSessionExpired: (isSessionExpired) => set({ isSessionExpired }),
   setLoading: (isLoading) => set({ isLoading }),
@@ -49,6 +54,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   reset: () => set({
     authUser: null,
     profile: null,
+    organisation: null,
     appSession: null,
     isSessionExpired: false,
     isLoading: false,

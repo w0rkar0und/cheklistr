@@ -40,6 +40,7 @@ on:
           - pdf
           - admin
           - api
+          - multi-tenancy
       skip_vercel_wait:
         description: 'Skip the 3-minute Vercel build wait (use when deployment is already live)'
         required: false
@@ -47,12 +48,13 @@ on:
         type: boolean
 
 # ─── Suite → file mapping ──────────────────────────────────────
-# smoke:     login, home, navigation
-# checklist: checklist, draft, submission
-# vrm:       vrm-lookup
-# pdf:       pdf-aspect-ratio
-# admin:     admin, admin-checklists
-# api:       api-auth, api-data, api-rls
+# smoke:           login, home, navigation
+# checklist:       checklist, draft, submission
+# vrm:             vrm-lookup
+# pdf:             pdf-aspect-ratio
+# admin:           admin, admin-checklists
+# api:             api-auth, api-data, api-rls
+# multi-tenancy:   multi-tenancy
 
 # ─── Jobs ──────────────────────────────────────────────────────
 jobs:
@@ -92,6 +94,7 @@ jobs:
         run: |
           cat > .env << ENVEOF
           BASE_URL=${{ secrets.E2E_BASE_URL }}
+          TEST_ORG_SLUG=greythorn
           TEST_USER_ID=${{ secrets.E2E_TEST_USER_ID }}
           TEST_USER_PASSWORD=${{ secrets.E2E_TEST_USER_PASSWORD }}
           ADMIN_USER_ID=${{ secrets.E2E_ADMIN_USER_ID }}
@@ -381,5 +384,51 @@ jobs:
         if: failure()
         with:
           name: results-api-${{ github.run_number }}
+          path: testing/e2e/test-results/
+          retention-days: 7
+
+  # ── Multi-Tenancy: org branding, SignedImage, super_admin ──────
+  multi-tenancy:
+    name: 'Suite: Multi-Tenancy'
+    needs: setup
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.suite == 'all'
+      || inputs.suite == 'multi-tenancy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: testing/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            testing/e2e/node_modules
+            testing/e2e/.env
+            ~/.cache/ms-playwright
+          key: e2e-${{ github.run_id }}
+
+      - name: Run multi-tenancy tests
+        run: npx playwright test multi-tenancy.spec.ts --project=chromium --project=admin-chromium
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-multi-tenancy-${{ github.run_number }}
+          path: testing/e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: results-multi-tenancy-${{ github.run_number }}
           path: testing/e2e/test-results/
           retention-days: 7

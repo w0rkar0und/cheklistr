@@ -7,7 +7,7 @@
 // ENUMS
 // ==========================================
 
-export type UserRole = 'site_manager' | 'admin';
+export type UserRole = 'site_manager' | 'admin' | 'super_admin';
 export type SessionTerminationReason = 'expired' | 'logout' | 'superseded';
 export type SubmissionStatus = 'draft' | 'submitted' | 'synced';
 export type FieldType = 'boolean' | 'text' | 'number' | 'image' | 'select';
@@ -20,8 +20,20 @@ export type PhotoType =
 // TABLE TYPES
 // ==========================================
 
+export interface Organisation {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url: string | null;
+  primary_colour: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: string;
+  org_id: string;
   login_id: string;
   contractor_id: string | null;
   full_name: string;
@@ -36,6 +48,7 @@ export interface User {
 export interface Session {
   id: string;
   user_id: string;
+  org_id: string;
   started_at: string;
   expires_at: string;
   terminated_at: string | null;
@@ -46,6 +59,7 @@ export interface Session {
 
 export interface Checklist {
   id: string;
+  org_id: string;
   name: string;
   description: string | null;
   is_active: boolean;
@@ -85,6 +99,7 @@ export interface ChecklistItem {
 
 export interface Submission {
   id: string;
+  org_id: string;
   user_id: string;
   session_id: string | null;
   checklist_version_id: string;

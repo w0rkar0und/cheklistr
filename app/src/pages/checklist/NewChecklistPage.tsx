@@ -644,6 +644,7 @@ export function NewChecklistPage() {
     await savePendingSubmission({
       submissionId: crypto.randomUUID(),
       userId: profile.id,
+      orgId: profile.org_id,
       checklistVersionId: store.version.id,
       vehicleRegistration: store.vehicleInfo.vehicleRegistration,
       mileage: store.vehicleInfo.mileage,

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { generateSubmissionPdf } from '../../lib/generateSubmissionPdf';
+import { SignedImage } from '../../components/common/SignedImage';
 import type { Submission, SubmissionPhoto, ChecklistResponse, Defect } from '../../types/database';
 
 interface FullSubmission extends Submission {
@@ -22,6 +23,7 @@ export function AdminSubmissionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const profile = useAuthStore((s) => s.profile);
+  const organisation = useAuthStore((s) => s.organisation);
   const [submission, setSubmission] = useState<FullSubmission | null>(null);
   const [submitter, setSubmitter] = useState<SubmitterInfo | null>(null);
   const [archivedByName, setArchivedByName] = useState<string | null>(null);
@@ -78,7 +80,8 @@ export function AdminSubmissionDetail() {
       await generateSubmissionPdf(
         submission as Parameters<typeof generateSubmissionPdf>[0],
         (msg) => setPdfProgress(msg),
-        submitter
+        submitter,
+        organisation?.name
       );
     } catch (err) {
       console.error('PDF generation failed:', err);
@@ -90,16 +93,19 @@ export function AdminSubmissionDetail() {
   };
 
   // Collect all viewable images (submission photos + defect photos) for lightbox
-  const allImages: { url: string; label: string }[] = submission
+  // Each entry stores bucket + storage path for signed URL generation
+  const allImages: { bucket: string; path: string; label: string }[] = submission
     ? [
         ...submission.photos.map((p) => ({
-          url: p.storage_url,
+          bucket: 'vehicle-photos',
+          path: p.storage_url,
           label: p.photo_type.replace(/_/g, ' '),
         })),
         ...submission.defects
           .filter((d) => d.image_url)
           .map((d) => ({
-            url: d.image_url!,
+            bucket: 'defect-photos',
+            path: d.image_url!,
             label: `Defect #${d.defect_number}`,
           })),
       ]
@@ -408,8 +414,9 @@ export function AdminSubmissionDetail() {
                 onClick={() => setLightboxIndex(idx)}
                 onKeyDown={(e) => { if (e.key === 'Enter') setLightboxIndex(idx); }}
               >
-                <img
-                  src={photo.storage_url}
+                <SignedImage
+                  bucket="vehicle-photos"
+                  path={photo.storage_url}
                   alt={photo.photo_type}
                   loading="lazy"
                 />
@@ -430,18 +437,22 @@ export function AdminSubmissionDetail() {
                 <strong>Defect #{defect.defect_number}</strong>
                 {defect.details && <p>{defect.details}</p>}
                 {defect.image_url && (
-                  <img
-                    src={defect.image_url}
-                    alt={`Defect ${defect.defect_number}`}
-                    loading="lazy"
+                  <div
                     className="defect-image defect-image--clickable"
                     role="button"
                     tabIndex={0}
                     onClick={() => {
-                      const idx = allImages.findIndex((img) => img.url === defect.image_url);
+                      const idx = allImages.findIndex((img) => img.path === defect.image_url);
                       if (idx >= 0) setLightboxIndex(idx);
                     }}
-                  />
+                  >
+                    <SignedImage
+                      bucket="defect-photos"
+                      path={defect.image_url}
+                      alt={`Defect ${defect.defect_number}`}
+                      loading="lazy"
+                    />
+                  </div>
                 )}
               </div>
             ))}
@@ -468,10 +479,12 @@ export function AdminSubmissionDetail() {
                 &#8249;
               </button>
             )}
-            <img
-              src={allImages[lightboxIndex].url}
+            <SignedImage
+              bucket={allImages[lightboxIndex].bucket}
+              path={allImages[lightboxIndex].path}
               alt={allImages[lightboxIndex].label}
               className="lightbox-image"
+              loading="eager"
             />
             {allImages.length > 1 && lightboxIndex < allImages.length - 1 && (
               <button className="lightbox-nav lightbox-nav--next" onClick={nextImage} aria-label="Next">

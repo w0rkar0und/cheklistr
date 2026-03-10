@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { User, Session as AppSession } from '../types/database';
+import type { User, Session as AppSession, Organisation } from '../types/database';
 
 // ============================================================
 // Auth Service — stateless functions for authentication
@@ -9,20 +9,50 @@ import type { User, Session as AppSession } from '../types/database';
 const SYNTHETIC_DOMAIN = 'cheklistr.app';
 
 /**
- * Convert a User ID (e.g. "X123456") to a synthetic email
+ * Convert a User ID + org slug to a synthetic email
  * for Supabase Auth, which requires an email address.
  * The user never sees this — they only interact via User ID.
+ *
+ * Format: {loginId}.{orgSlug}@cheklistr.app
+ * e.g. x123456.greythorn@cheklistr.app
  */
-export function toSyntheticEmail(loginId: string): string {
-  return `${loginId.toLowerCase().trim()}@${SYNTHETIC_DOMAIN}`;
+export function toSyntheticEmail(loginId: string, orgSlug: string): string {
+  return `${loginId.toLowerCase().trim()}.${orgSlug.toLowerCase().trim()}@${SYNTHETIC_DOMAIN}`;
 }
 
 /**
- * Sign in with User ID + password via Supabase Auth.
- * Converts the User ID to a synthetic email internally.
+ * Look up an organisation by its slug.
+ * Called before authentication to validate the org exists and is active.
+ * Uses the anon key (no auth required) — RLS allows public reads on active orgs.
+ * Note: We use a service-level approach here by querying without auth;
+ * the org lookup happens pre-login so there's no authenticated user yet.
+ * The RLS policy allows any authenticated user to read their own org,
+ * but for the login flow we need a function that works pre-auth.
+ * We use supabase.rpc or a direct REST call for this.
  */
-export async function signIn(loginId: string, password: string) {
-  const email = toSyntheticEmail(loginId);
+export async function lookupOrganisation(slug: string): Promise<{ data: Organisation | null; error: unknown }> {
+  // Query organisations table — the anon key can reach this
+  // because we'll add a public SELECT policy for active orgs by slug
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('*')
+    .eq('slug', slug.toLowerCase().trim())
+    .eq('is_active', true)
+    .single();
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  return { data: data as Organisation, error: null };
+}
+
+/**
+ * Sign in with org slug + User ID + password via Supabase Auth.
+ * Converts the User ID and org slug to a synthetic email internally.
+ */
+export async function signIn(loginId: string, orgSlug: string, password: string) {
+  const email = toSyntheticEmail(loginId, orgSlug);
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -68,11 +98,29 @@ export async function fetchUserProfile(userId: string): Promise<{ data: User | n
 }
 
 /**
+ * Fetch the organisation for the current user.
+ */
+export async function fetchOrganisation(orgId: string): Promise<{ data: Organisation | null; error: unknown }> {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('*')
+    .eq('id', orgId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching organisation:', error);
+    return { data: null, error };
+  }
+
+  return { data: data as Organisation, error: null };
+}
+
+/**
  * Create an app-level session in the sessions table.
  * The DB trigger `terminate_existing_sessions` will automatically
  * terminate any previous active sessions for this user.
  */
-export async function createAppSession(userId: string): Promise<{ data: AppSession | null; error: unknown }> {
+export async function createAppSession(userId: string, orgId: string): Promise<{ data: AppSession | null; error: unknown }> {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours
 
@@ -90,6 +138,7 @@ export async function createAppSession(userId: string): Promise<{ data: AppSessi
     .from('sessions')
     .insert({
       user_id: userId,
+      org_id: orgId,
       expires_at: expiresAt.toISOString(),
       device_info: deviceInfo,
     })
@@ -134,4 +183,25 @@ export async function extendSession(sessionId: string): Promise<boolean> {
     .eq('id', sessionId);
 
   return !error;
+}
+
+/**
+ * Create a signed URL for a file in a private storage bucket.
+ * Returns null if signing fails.
+ */
+export async function createSignedUrl(
+  bucket: string,
+  path: string,
+  expiresIn: number = 3600 // 1 hour default
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, expiresIn);
+
+  if (error || !data?.signedUrl) {
+    console.error('Error creating signed URL:', error);
+    return null;
+  }
+
+  return data.signedUrl;
 }

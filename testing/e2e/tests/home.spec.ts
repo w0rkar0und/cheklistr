@@ -18,6 +18,12 @@ test.describe('Home Page (authenticated)', () => {
     await expect(page.locator('.home-section h3')).toContainText('Recent Submissions');
   });
 
+  test('header shows organisation name or logo', async ({ page }) => {
+    // Multi-tenancy: header displays org name (Greythorn Contract Logistics) or fallback
+    const header = page.locator('.app-header');
+    await expect(header).toContainText(/Greythorn|Cheklistr/);
+  });
+
   test('shows Sign Out button', async ({ page }) => {
     const btn = page.locator('button', { hasText: 'Sign Out' });
     await expect(btn).toBeVisible();

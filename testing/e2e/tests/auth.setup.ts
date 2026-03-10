@@ -8,8 +8,11 @@ const authFile = path.join(authDir, 'user.json');
 /**
  * Authenticates as the test user and saves browser state (cookies, localStorage)
  * so all subsequent tests skip the login flow.
+ *
+ * Multi-tenancy: login now requires Organisation ID, User ID, and Password.
  */
 setup('authenticate as test user', async ({ page }) => {
+  const orgSlug = process.env.TEST_ORG_SLUG ?? 'greythorn';
   const userId = process.env.TEST_USER_ID;
   const password = process.env.TEST_USER_PASSWORD;
 
@@ -28,10 +31,11 @@ setup('authenticate as test user', async ({ page }) => {
   console.log(`[auth-setup] Page title: "${pageTitle}"`);
   console.log(`[auth-setup] Body text preview: "${bodyText.substring(0, 200)}"`);
 
-  // Wait for the React app to mount — the login form input is a reliable marker
-  await expect(page.locator('#login-id')).toBeVisible({ timeout: 15_000 });
+  // Wait for the React app to mount — the org slug field is the first input
+  await expect(page.locator('#org-slug')).toBeVisible({ timeout: 15_000 });
 
-  // Fill login form
+  // Fill three-field login form
+  await page.fill('#org-slug', orgSlug);
   await page.fill('#login-id', userId);
   await page.fill('#password', password);
 

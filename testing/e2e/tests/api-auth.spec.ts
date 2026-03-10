@@ -2,8 +2,10 @@ import { test, expect } from '@playwright/test';
 import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
+  TEST_ORG_SLUG,
   toSyntheticEmail,
   getAccessToken,
+  lookupOrganisation,
 } from './helpers/supabase-api';
 
 // These tests run without a browser — pure API calls
@@ -14,10 +16,16 @@ const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD!;
 
 // ─── Authentication API ─────────────────────────────────────────
 test.describe('Supabase Auth API', () => {
-  test('synthetic email mapping is correct', () => {
-    expect(toSyntheticEmail('X123456')).toBe('x123456@cheklistr.app');
-    expect(toSyntheticEmail('TestUser01')).toBe('testuser01@cheklistr.app');
-    expect(toSyntheticEmail('ADMIN')).toBe('admin@cheklistr.app');
+  test('synthetic email mapping includes org slug', () => {
+    // Multi-tenancy format: {loginId}.{orgSlug}@cheklistr.app
+    expect(toSyntheticEmail('X123456')).toBe(`x123456.${TEST_ORG_SLUG}@cheklistr.app`);
+    expect(toSyntheticEmail('TestUser01')).toBe(`testuser01.${TEST_ORG_SLUG}@cheklistr.app`);
+    expect(toSyntheticEmail('ADMIN')).toBe(`admin.${TEST_ORG_SLUG}@cheklistr.app`);
+  });
+
+  test('synthetic email accepts custom org slug', () => {
+    expect(toSyntheticEmail('X123456', 'acme')).toBe('x123456.acme@cheklistr.app');
+    expect(toSyntheticEmail('USER01', 'other-org')).toBe('user01.other-org@cheklistr.app');
   });
 
   test('valid credentials return an access token', async () => {
@@ -87,5 +95,32 @@ test.describe('Supabase Auth API', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data).toEqual([]);
+  });
+});
+
+// ─── Organisation Lookup (Anon) ─────────────────────────────────
+test.describe('Organisation Lookup API', () => {
+  test('valid org slug returns organisation data', async () => {
+    const { status, data } = await lookupOrganisation('greythorn');
+    expect(status).toBe(200);
+    expect(Array.isArray(data)).toBe(true);
+    expect((data as any[]).length).toBe(1);
+
+    const org = (data as any[])[0];
+    expect(org.slug).toBe('greythorn');
+    expect(org.name).toBeTruthy();
+    expect(org.is_active).toBe(true);
+  });
+
+  test('non-existent org slug returns empty array', async () => {
+    const { status, data } = await lookupOrganisation('nonexistent-org-xyz-999');
+    expect(status).toBe(200);
+    expect(data).toEqual([]);
+  });
+
+  test('org lookup works without authentication (anon access)', async () => {
+    // This verifies migration 015 — anon role can SELECT active organisations
+    const { status } = await lookupOrganisation('greythorn');
+    expect(status).toBe(200);
   });
 });

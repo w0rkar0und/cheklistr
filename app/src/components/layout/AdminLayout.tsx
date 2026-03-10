@@ -3,13 +3,29 @@ import { useAuthStore } from '../../stores/authStore';
 
 export function AdminLayout() {
   const profile = useAuthStore((s) => s.profile);
+  const organisation = useAuthStore((s) => s.organisation);
+
+  // Apply org branding via CSS custom property
+  const brandStyle = organisation?.primary_colour
+    ? { '--org-primary': organisation.primary_colour } as React.CSSProperties
+    : undefined;
 
   return (
-    <div className="admin-layout">
+    <div className="admin-layout" style={brandStyle}>
       <aside className="admin-sidebar">
         <div className="sidebar-header">
-          <h2>Cheklistr</h2>
-          <span className="sidebar-badge">Admin</span>
+          {organisation?.logo_url ? (
+            <img
+              src={organisation.logo_url}
+              alt={organisation.name}
+              className="sidebar-logo"
+            />
+          ) : (
+            <h2>{organisation?.name ?? 'Cheklistr'}</h2>
+          )}
+          <span className="sidebar-badge">
+            {profile?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+          </span>
         </div>
         <nav className="sidebar-nav">
           <NavLink to="/admin" end>Dashboard</NavLink>

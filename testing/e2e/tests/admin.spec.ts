@@ -8,10 +8,19 @@ test.describe('Admin Layout', () => {
     await expect(page.locator('.admin-sidebar')).toBeVisible();
   });
 
-  test('sidebar shows admin badge and app title', async ({ page }) => {
+  test('sidebar shows role badge (Admin or Super Admin)', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.locator('.sidebar-header')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('.sidebar-badge')).toContainText('Admin');
+    // Badge should show either "Admin" or "Super Admin" depending on the test user's role
+    await expect(page.locator('.sidebar-badge')).toContainText(/Admin|Super Admin/);
+  });
+
+  test('sidebar shows organisation name', async ({ page }) => {
+    await page.goto('/admin');
+    await expect(page.locator('.sidebar-header')).toBeVisible({ timeout: 15_000 });
+    // With multi-tenancy, the sidebar header shows the org name (or logo)
+    // Greythorn seed data: "Greythorn Contract Logistics"
+    await expect(page.locator('.sidebar-header')).toContainText(/Greythorn|Cheklistr/);
   });
 
   test('sidebar has all navigation links', async ({ page }) => {
@@ -280,6 +289,7 @@ test.describe('Admin Users', () => {
     }
     expect(optionTexts).toContain('site manager');
     expect(optionTexts).toContain('admin');
+    expect(optionTexts).toContain('super admin');
   });
 
   test('users table or empty state is displayed', async ({ page }) => {

@@ -51,7 +51,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   // Check role if required
-  if (requiredRole && profile.role !== requiredRole) {
+  // super_admin passes all role checks (including 'admin')
+  if (requiredRole && profile.role !== requiredRole && profile.role !== 'super_admin') {
     return <Navigate to="/" replace />;
   }
 

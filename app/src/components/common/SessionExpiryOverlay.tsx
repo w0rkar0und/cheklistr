@@ -14,6 +14,7 @@ export function SessionExpiryOverlay() {
   const [loading, setLoading] = useState(false);
 
   const profile = useAuthStore((s) => s.profile);
+  const organisation = useAuthStore((s) => s.organisation);
   const navigate = useNavigate();
 
   const handleReauth = async (e: FormEvent) => {
@@ -24,8 +25,9 @@ export function SessionExpiryOverlay() {
     setLoading(true);
 
     try {
-      // Re-authenticate with the same User ID
-      const { data, error: signInError } = await signIn(profile.login_id, password);
+      // Re-authenticate with the same User ID and org slug
+      const orgSlug = organisation?.slug ?? '';
+      const { data, error: signInError } = await signIn(profile.login_id, orgSlug, password);
       if (signInError || !data.user) {
         setError(signInError?.message ?? 'Re-authentication failed');
         setLoading(false);
@@ -39,7 +41,7 @@ export function SessionExpiryOverlay() {
       }
 
       // Create a new app session
-      const { data: newSession } = await createAppSession(data.user.id);
+      const { data: newSession } = await createAppSession(data.user.id, profile.org_id);
       if (newSession) {
         useAuthStore.getState().setAppSession(newSession);
       }

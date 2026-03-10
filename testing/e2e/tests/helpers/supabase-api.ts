@@ -13,11 +13,16 @@ const SUPABASE_ANON_KEY =
 
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
+/** Default org slug used by all Greythorn test users. */
+export const TEST_ORG_SLUG = process.env.TEST_ORG_SLUG ?? 'greythorn';
+
 /**
- * Convert a user login ID to the synthetic email used by Supabase Auth.
+ * Convert a user login ID + org slug to the synthetic email used by Supabase Auth.
+ * Multi-tenancy format: `{loginId}.{orgSlug}@cheklistr.app`
  */
-export function toSyntheticEmail(loginId: string): string {
-  return `${loginId.toLowerCase()}@cheklistr.app`;
+export function toSyntheticEmail(loginId: string, orgSlug?: string): string {
+  const slug = orgSlug ?? TEST_ORG_SLUG;
+  return `${loginId.toLowerCase()}.${slug}@cheklistr.app`;
 }
 
 /**
@@ -25,9 +30,10 @@ export function toSyntheticEmail(loginId: string): string {
  */
 export async function getAccessToken(
   loginId: string,
-  password: string
+  password: string,
+  orgSlug?: string
 ): Promise<string> {
-  const email = toSyntheticEmail(loginId);
+  const email = toSyntheticEmail(loginId, orgSlug);
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -40,11 +46,25 @@ export async function getAccessToken(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Auth failed for ${loginId} (${res.status}): ${body}`);
+    throw new Error(`Auth failed for ${loginId}@${orgSlug ?? TEST_ORG_SLUG} (${res.status}): ${body}`);
   }
 
   const data = await res.json();
   return data.access_token;
+}
+
+/**
+ * Look up an organisation by slug via the REST API (anon access — migration 015).
+ */
+export async function lookupOrganisation(
+  slug: string
+): Promise<{ status: number; data: unknown }> {
+  const url = `${SUPABASE_URL}/rest/v1/organisations?slug=eq.${encodeURIComponent(slug)}&is_active=eq.true&select=id,name,slug,is_active`;
+  const res = await fetch(url, {
+    headers: { apikey: SUPABASE_ANON_KEY },
+  });
+  const data = await res.json().catch(() => null);
+  return { status: res.status, data };
 }
 
 /**

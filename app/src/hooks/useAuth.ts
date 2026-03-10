@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { fetchUserProfile, checkSessionValidity } from '../lib/auth';
+import { fetchUserProfile, fetchOrganisation, checkSessionValidity } from '../lib/auth';
 import { useAuthStore } from '../stores/authStore';
 
 // Session validity check interval (5 minutes)
@@ -21,6 +21,23 @@ function getSessionFromStorage() {
     return JSON.parse(raw);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Load user profile and organisation context into the store.
+ * Reused by both initial load and auth state change handler.
+ */
+async function loadProfileAndOrg(userId: string) {
+  const store = useAuthStore.getState();
+  const { data: profile } = await fetchUserProfile(userId);
+  if (profile) {
+    store.setProfile(profile);
+    // Load organisation context
+    const { data: org } = await fetchOrganisation(profile.org_id);
+    if (org) {
+      store.setOrganisation(org);
+    }
   }
 }
 
@@ -48,10 +65,7 @@ export function useAuth() {
         const session = getSessionFromStorage();
         if (session?.user) {
           store.setAuthUser(session.user);
-          const { data: profile } = await fetchUserProfile(session.user.id);
-          if (profile) {
-            store.setProfile(profile);
-          }
+          await loadProfileAndOrg(session.user.id);
         }
       } catch (error) {
         console.error('Auth initialisation error:', error);
@@ -82,10 +96,7 @@ export function useAuth() {
 
               if (event === 'SIGNED_IN' && session?.user) {
                 store.setAuthUser(session.user);
-                const { data: profile } = await fetchUserProfile(session.user.id);
-                if (profile) {
-                  store.setProfile(profile);
-                }
+                await loadProfileAndOrg(session.user.id);
               } else if (event === 'SIGNED_OUT') {
                 stopSessionChecks();
                 store.reset();

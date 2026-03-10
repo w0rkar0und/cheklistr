@@ -3,12 +3,26 @@ import { useAuthStore } from '../../stores/authStore';
 
 export function AppLayout() {
   const profile = useAuthStore((s) => s.profile);
+  const organisation = useAuthStore((s) => s.organisation);
+
+  // Apply org branding via CSS custom property
+  const brandStyle = organisation?.primary_colour
+    ? { '--org-primary': organisation.primary_colour } as React.CSSProperties
+    : undefined;
 
   return (
-    <div className="app-layout">
+    <div className="app-layout" style={brandStyle}>
       <header className="app-header">
         <div className="header-content">
-          <h1 className="header-title">Cheklistr</h1>
+          {organisation?.logo_url ? (
+            <img
+              src={organisation.logo_url}
+              alt={organisation.name}
+              className="header-logo"
+            />
+          ) : (
+            <h1 className="header-title">{organisation?.name ?? 'Cheklistr'}</h1>
+          )}
           {profile && (
             <span className="header-user">{profile.full_name}</span>
           )}

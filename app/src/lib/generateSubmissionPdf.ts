@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { createSignedUrl } from './auth';
 import type { FullSubmission, SubmissionPhoto } from '../types/database';
 
 // Extended response type with joined labels
@@ -43,12 +44,16 @@ interface LoadedImage {
 }
 
 /**
- * Load an image URL as a base64 data URL with natural dimensions.
+ * Load an image from a private storage bucket as a base64 data URL.
+ * Uses signed URLs (300s expiry) to access private bucket content.
  * Returns null if the image fails to load.
  */
-async function loadImageAsBase64(url: string): Promise<LoadedImage | null> {
+async function loadImageAsBase64(bucket: string, path: string): Promise<LoadedImage | null> {
   try {
-    const response = await fetch(url);
+    const signedUrl = await createSignedUrl(bucket, path, 300);
+    if (!signedUrl) return null;
+
+    const response = await fetch(signedUrl);
     if (!response.ok) return null;
     const blob = await response.blob();
 
@@ -107,7 +112,8 @@ export interface SubmitterDetails {
 export async function generateSubmissionPdf(
   submission: FullSubmission & { responses: ResponseWithLabels[] },
   onProgress?: (msg: string) => void,
-  submitter?: SubmitterDetails | null
+  submitter?: SubmitterDetails | null,
+  orgName?: string
 ): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -133,7 +139,7 @@ export async function generateSubmissionPdf(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120, 120, 120);
-  doc.text('Greythorn Contract Logistics', margin, y + 4);
+  doc.text(orgName ?? 'Cheklistr', margin, y + 4);
   doc.text(`Report generated: ${formatDate(new Date().toISOString())}`, pageWidth - margin, y + 4, { align: 'right' });
   y += 8;
 
@@ -309,7 +315,7 @@ export async function generateSubmissionPdf(
 
       if (defect.image_url) {
         onProgress?.('Loading defect image…');
-        const imgData = await loadImageAsBase64(defect.image_url);
+        const imgData = await loadImageAsBase64('defect-photos', defect.image_url);
         if (imgData) {
           // Fit within 60mm wide × 80mm tall, preserving aspect ratio
           const { w, h } = fitImage(imgData, 60, 80);
@@ -340,7 +346,7 @@ export async function generateSubmissionPdf(
     const photoEntries: { photo: SubmissionPhoto; data: LoadedImage }[] = [];
     const loadPromises = submission.photos.map(async (photo) => {
       onProgress?.(`Loading ${photo.photo_type.replace(/_/g, ' ')}…`);
-      const data = await loadImageAsBase64(photo.storage_url);
+      const data = await loadImageAsBase64('vehicle-photos', photo.storage_url);
       if (data) {
         photoEntries.push({ photo, data });
       }
