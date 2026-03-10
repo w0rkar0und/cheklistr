@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 // useChecklistStore not needed here — draft is loaded in NewChecklistPage from IndexedDB
 import { signOut } from '../../lib/auth';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { getPendingCount, getDraft, deleteDraft } from '../../lib/offlineDb';
 import type { DraftFormState } from '../../lib/offlineDb';
 import type { Submission } from '../../types/database';
@@ -57,36 +57,21 @@ export function HomePage() {
     loadDraft();
   }, []);
 
-  // Load recent submissions for this user (raw fetch — supabase client
-  // can hang in Capacitor WebView when its auth session is stale)
+  // Load recent submissions for this user
   useEffect(() => {
     const load = async () => {
       if (!profile) return;
       setLoadingSubs(true);
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
-      try {
-        const accessToken = getAccessTokenFromStorage();
-        if (!accessToken) {
-          setLoadingSubs(false);
-          return;
-        }
-
-        const url = `${SUPABASE_URL}/rest/v1/submissions?user_id=eq.${encodeURIComponent(profile.id)}&order=created_at.desc&limit=10&select=*`;
-        const res = await fetch(url, {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setRecentSubmissions(data as Submission[]);
-        }
-      } catch (err) {
-        console.error('[HOME] Failed to load submissions:', err);
+      if (!error && data) {
+        setRecentSubmissions(data as Submission[]);
       }
-
       setLoadingSubs(false);
     };
     load();

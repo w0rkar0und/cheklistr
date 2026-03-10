@@ -1,7 +1,5 @@
 import { useRef } from 'react';
 import type { PhotoType } from '../../types/database';
-import { isNativePlatform } from '../../lib/capacitorPlatform';
-import { capturePhoto, pickPhoto } from '../../lib/nativeCamera';
 
 const REQUIRED_PHOTOS: { type: PhotoType; label: string }[] = [
   { type: 'front', label: 'Front' },
@@ -71,7 +69,7 @@ export function VehiclePhotosStep({
 }
 
 // ============================================================
-// Individual photo slot — native camera on Capacitor, HTML inputs on web
+// Individual photo slot — two separate inputs for camera vs gallery
 // ============================================================
 
 interface PhotoSlotProps {
@@ -101,35 +99,17 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
     if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
-  const openCamera = async () => {
-    if (isNativePlatform()) {
-      try {
-        const result = await capturePhoto('rear');
-        onCapture(photoType, result.file, result.previewUrl);
-      } catch (err) {
-        console.warn('Camera capture cancelled or failed:', err);
-      }
-    } else {
-      if (cameraInputRef.current) {
-        cameraInputRef.current.value = '';
-        cameraInputRef.current.click();
-      }
+  const openCamera = () => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
     }
   };
 
-  const openGallery = async () => {
-    if (isNativePlatform()) {
-      try {
-        const result = await pickPhoto();
-        onCapture(photoType, result.file, result.previewUrl);
-      } catch (err) {
-        console.warn('Gallery pick cancelled or failed:', err);
-      }
-    } else {
-      if (galleryInputRef.current) {
-        galleryInputRef.current.value = '';
-        galleryInputRef.current.click();
-      }
+  const openGallery = () => {
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = '';
+      galleryInputRef.current.click();
     }
   };
 
@@ -173,7 +153,7 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
         </div>
       )}
 
-      {/* Hidden file inputs — always rendered so refs are never null on web */}
+      {/* Camera input — capture="environment" forces rear camera */}
       <input
         ref={cameraInputRef}
         type="file"
@@ -181,15 +161,14 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
         capture="environment"
         onChange={handleFile}
         className="photo-slot-input"
-        style={{ display: 'none' }}
       />
+      {/* Gallery input — no capture attribute opens file/gallery picker */}
       <input
         ref={galleryInputRef}
         type="file"
         accept="image/*"
         onChange={handleFile}
         className="photo-slot-input"
-        style={{ display: 'none' }}
       />
     </div>
   );

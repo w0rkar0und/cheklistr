@@ -1,4 +1,4 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from './supabase';
+import { supabase } from './supabase';
 import { cacheChecklist, getCachedChecklist } from './offlineDb';
 import type {
   Checklist,
@@ -9,42 +9,8 @@ import type {
 } from '../types/database';
 
 /**
- * Helper: raw PostgREST fetch that bypasses the Supabase JS client.
- * The JS client can hang in Capacitor WebView when its internal auth
- * session is mid-refresh; raw fetch with an explicit token avoids this.
- */
-async function postgrestFetch<T>(
-  path: string,
-): Promise<{ data: T | null; error: string | null }> {
-  const accessToken = getAccessTokenFromStorage();
-  if (!accessToken) {
-    return { data: null, error: 'Not authenticated' };
-  }
-
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${accessToken}`,
-      'Accept': 'application/json',
-    },
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('[CHECKLIST] PostgREST error:', res.status, errText);
-    return { data: null, error: `Request failed (${res.status})` };
-  }
-
-  const data = await res.json();
-  return { data: data as T, error: null };
-}
-
-/**
  * Fetch the currently active checklist and its active version
  * with all sections and items, ordered by display_order.
- *
- * Uses raw PostgREST fetch (not the Supabase JS client) to avoid
- * session-hang issues inside Capacitor WebView.
  */
 export async function fetchActiveChecklist(): Promise<{
   checklist: Checklist | null;
@@ -52,65 +18,74 @@ export async function fetchActiveChecklist(): Promise<{
   error: string | null;
 }> {
   // 1. Get the active checklist
-  const { data: checklists, error: clError } = await postgrestFetch<Checklist[]>(
-    'checklists?is_active=eq.true&limit=1',
-  );
+  const { data: checklists, error: clError } = await supabase
+    .from('checklists')
+    .select('*')
+    .eq('is_active', true)
+    .limit(1);
 
   if (clError || !checklists?.length) {
     return {
       checklist: null,
       version: null,
-      error: clError ?? 'No active checklist found',
+      error: clError?.message ?? 'No active checklist found',
     };
   }
 
-  const checklist = checklists[0];
+  const checklist = checklists[0] as Checklist;
 
   // 2. Get the active version for this checklist
-  const { data: versions, error: vError } = await postgrestFetch<ChecklistVersion[]>(
-    `checklist_versions?checklist_id=eq.${encodeURIComponent(checklist.id)}&is_active=eq.true&limit=1`,
-  );
+  const { data: versions, error: vError } = await supabase
+    .from('checklist_versions')
+    .select('*')
+    .eq('checklist_id', checklist.id)
+    .eq('is_active', true)
+    .limit(1);
 
   if (vError || !versions?.length) {
     return {
       checklist,
       version: null,
-      error: vError ?? 'No active checklist version found',
+      error: vError?.message ?? 'No active checklist version found',
     };
   }
 
-  const version = versions[0];
+  const version = versions[0] as ChecklistVersion;
 
   // 3. Get sections for this version, ordered
-  const { data: sections, error: sError } = await postgrestFetch<ChecklistSection[]>(
-    `checklist_sections?checklist_version_id=eq.${encodeURIComponent(version.id)}&order=display_order.asc`,
-  );
+  const { data: sections, error: sError } = await supabase
+    .from('checklist_sections')
+    .select('*')
+    .eq('checklist_version_id', version.id)
+    .order('display_order', { ascending: true });
 
-  if (sError || !sections) {
+  if (sError) {
     return {
       checklist,
       version: null,
-      error: sError ?? 'Failed to load checklist sections',
+      error: sError.message,
     };
   }
 
   // 4. Get all items for these sections, ordered
-  const sectionIds = sections.map((s) => s.id);
-  const { data: items, error: iError } = await postgrestFetch<ChecklistItem[]>(
-    `checklist_items?section_id=in.(${sectionIds.map(encodeURIComponent).join(',')})&order=display_order.asc`,
-  );
+  const sectionIds = (sections as ChecklistSection[]).map((s) => s.id);
+  const { data: items, error: iError } = await supabase
+    .from('checklist_items')
+    .select('*')
+    .in('section_id', sectionIds)
+    .order('display_order', { ascending: true });
 
-  if (iError || !items) {
+  if (iError) {
     return {
       checklist,
       version: null,
-      error: iError ?? 'Failed to load checklist items',
+      error: iError.message,
     };
   }
 
   // 5. Assemble the full version with nested sections → items
   const itemsBySection = new Map<string, ChecklistItem[]>();
-  for (const item of items) {
+  for (const item of items as ChecklistItem[]) {
     const existing = itemsBySection.get(item.section_id) ?? [];
     existing.push(item);
     itemsBySection.set(item.section_id, existing);
@@ -118,7 +93,7 @@ export async function fetchActiveChecklist(): Promise<{
 
   const fullVersion: FullChecklistVersion = {
     ...version,
-    sections: sections.map((section) => ({
+    sections: (sections as ChecklistSection[]).map((section) => ({
       ...section,
       items: itemsBySection.get(section.id) ?? [],
     })),
