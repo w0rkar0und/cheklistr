@@ -3,15 +3,34 @@ import { test, expect } from '@playwright/test';
 /**
  * Helper: performs VRM lookup and waits for EITHER success or warning.
  * Returns { succeeded, warned, warningText } so tests can branch accordingly.
+ * Also intercepts the edge function HTTP response for diagnostic logging.
  */
 async function performLookupAndWait(
   page: import('@playwright/test').Page,
   vrm: string
 ): Promise<{ succeeded: boolean; warned: boolean; warningText: string }> {
+  // Intercept the edge function response for diagnostics
+  const edgeFnResponsePromise = page.waitForResponse(
+    (res) => res.url().includes('/functions/v1/vehicle-lookup'),
+    { timeout: 30_000 }
+  ).catch(() => null);
+
   await page.fill('#vehicle-reg', vrm);
   const lookupBtn = page.locator('.btn-lookup');
   await expect(lookupBtn).toBeEnabled();
   await lookupBtn.click();
+
+  // Capture the edge function HTTP response
+  const edgeResponse = await edgeFnResponsePromise;
+  if (edgeResponse) {
+    const status = edgeResponse.status();
+    const body = await edgeResponse.text().catch(() => '(could not read body)');
+    console.log(`[VRM edge-fn] HTTP ${status} — ${body}`);
+    test.info().annotations.push({
+      type: 'edge-fn-response',
+      description: `HTTP ${status}: ${body.substring(0, 200)}`,
+    });
+  }
 
   // Wait for either outcome
   const success = page.locator('.lookup-success');
