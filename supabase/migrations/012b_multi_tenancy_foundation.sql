@@ -1,14 +1,14 @@
 -- ============================================================
--- Migration 012: Multi-Tenancy Foundation
+-- Migration 012b: Multi-Tenancy Foundation
 -- ============================================================
 -- Creates the organisations table, threads org_id through
--- users/checklists/submissions/sessions, expands the role
--- enum with super_admin, updates the login_id uniqueness
--- constraint, creates helper functions, and updates RPCs.
+-- users/checklists/submissions/sessions, updates the login_id
+-- uniqueness constraint, creates helper functions, and updates RPCs.
 --
 -- This migration seeds Greythorn as the first org and
 -- backfills all existing data to belong to it.
 --
+-- PREREQUISITE: Run 012a first (adds super_admin enum value).
 -- IMPORTANT: Run this BEFORE migration 013 (RLS rewrite)
 -- and 014 (storage changes).
 -- ============================================================
@@ -48,67 +48,59 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.organisations
 
 INSERT INTO public.organisations (id, name, slug, primary_colour)
 VALUES (
-  'org00000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000001',
   'Greythorn Contract Logistics',
   'greythorn',
   '#2E4057'
 );
 
 -- ==========================================
--- 3. EXPAND USER ROLE ENUM
--- ==========================================
--- PostgreSQL doesn't allow reordering enum values, but
--- ALTER TYPE ... ADD VALUE is safe and non-blocking.
-
-ALTER TYPE user_role ADD VALUE 'super_admin';
-
--- ==========================================
--- 4. ADD org_id TO PARENT TABLES
+-- 3. ADD org_id TO PARENT TABLES
 -- ==========================================
 -- Strategy: add column with default → backfill → drop default → set NOT NULL
 
--- 4a. users
+-- 3a. users
 ALTER TABLE public.users
   ADD COLUMN org_id UUID REFERENCES public.organisations(id)
-  DEFAULT 'org00000-0000-0000-0000-000000000001';
+  DEFAULT '00000000-0000-0000-0000-000000000001';
 
-UPDATE public.users SET org_id = 'org00000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
+UPDATE public.users SET org_id = '00000000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
 
 ALTER TABLE public.users ALTER COLUMN org_id SET NOT NULL;
 ALTER TABLE public.users ALTER COLUMN org_id DROP DEFAULT;
 
 CREATE INDEX idx_users_org_id ON public.users(org_id);
 
--- 4b. checklists
+-- 3b. checklists
 ALTER TABLE public.checklists
   ADD COLUMN org_id UUID REFERENCES public.organisations(id)
-  DEFAULT 'org00000-0000-0000-0000-000000000001';
+  DEFAULT '00000000-0000-0000-0000-000000000001';
 
-UPDATE public.checklists SET org_id = 'org00000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
+UPDATE public.checklists SET org_id = '00000000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
 
 ALTER TABLE public.checklists ALTER COLUMN org_id SET NOT NULL;
 ALTER TABLE public.checklists ALTER COLUMN org_id DROP DEFAULT;
 
 CREATE INDEX idx_checklists_org_id ON public.checklists(org_id);
 
--- 4c. submissions
+-- 3c. submissions
 ALTER TABLE public.submissions
   ADD COLUMN org_id UUID REFERENCES public.organisations(id)
-  DEFAULT 'org00000-0000-0000-0000-000000000001';
+  DEFAULT '00000000-0000-0000-0000-000000000001';
 
-UPDATE public.submissions SET org_id = 'org00000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
+UPDATE public.submissions SET org_id = '00000000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
 
 ALTER TABLE public.submissions ALTER COLUMN org_id SET NOT NULL;
 ALTER TABLE public.submissions ALTER COLUMN org_id DROP DEFAULT;
 
 CREATE INDEX idx_submissions_org_id ON public.submissions(org_id);
 
--- 4d. sessions
+-- 3d. sessions
 ALTER TABLE public.sessions
   ADD COLUMN org_id UUID REFERENCES public.organisations(id)
-  DEFAULT 'org00000-0000-0000-0000-000000000001';
+  DEFAULT '00000000-0000-0000-0000-000000000001';
 
-UPDATE public.sessions SET org_id = 'org00000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
+UPDATE public.sessions SET org_id = '00000000-0000-0000-0000-000000000001' WHERE org_id IS NULL;
 
 ALTER TABLE public.sessions ALTER COLUMN org_id SET NOT NULL;
 ALTER TABLE public.sessions ALTER COLUMN org_id DROP DEFAULT;
@@ -116,7 +108,7 @@ ALTER TABLE public.sessions ALTER COLUMN org_id DROP DEFAULT;
 CREATE INDEX idx_sessions_org_id ON public.sessions(org_id);
 
 -- ==========================================
--- 5. UPDATE login_id UNIQUENESS
+-- 4. UPDATE login_id UNIQUENESS
 -- ==========================================
 -- Currently: login_id is globally unique.
 -- New: login_id is unique WITHIN an organisation.
@@ -129,10 +121,10 @@ ALTER TABLE public.users
   ADD CONSTRAINT users_login_id_org_unique UNIQUE (org_id, login_id);
 
 -- ==========================================
--- 6. HELPER FUNCTIONS FOR MULTI-TENANCY
+-- 5. HELPER FUNCTIONS FOR MULTI-TENANCY
 -- ==========================================
 
--- 6a. Get the org_id of the currently authenticated user.
+-- 5a. Get the org_id of the currently authenticated user.
 -- Returns NULL if user not found (e.g. super_admin without org).
 -- SECURITY DEFINER so it bypasses RLS when reading users table.
 CREATE OR REPLACE FUNCTION public.get_user_org_id()
@@ -142,7 +134,7 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 COMMENT ON FUNCTION public.get_user_org_id IS 'Returns the org_id of the currently authenticated user for RLS filtering';
 
--- 6b. Check if current user is a super_admin.
+-- 5b. Check if current user is a super_admin.
 CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
@@ -153,7 +145,7 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 COMMENT ON FUNCTION public.is_super_admin IS 'Returns true if the current user has super_admin role (platform operator)';
 
--- 6c. Update is_admin() to also return true for super_admin.
+-- 5c. Update is_admin() to also return true for super_admin.
 -- This ensures existing admin-level operations still work
 -- for super_admins without needing separate checks everywhere.
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -165,7 +157,7 @@ RETURNS BOOLEAN AS $$
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- ==========================================
--- 7. UPDATE admin_create_user RPC
+-- 6. UPDATE admin_create_user RPC
 -- ==========================================
 -- Now accepts org_id and validates the calling admin
 -- belongs to the same org (or is super_admin).
@@ -224,19 +216,7 @@ END;
 $$;
 
 -- ==========================================
--- 8. UPDATE SESSION TERMINATION TRIGGER
--- ==========================================
--- The existing trigger terminates all sessions for a user.
--- With multi-tenancy, sessions also carry org_id. The trigger
--- logic doesn't need org filtering (it's per-user), but we
--- add org_id context for the new session row.
-
--- No change needed to the trigger function itself — it
--- terminates by user_id which is already globally unique.
--- The org_id on sessions is set by the INSERT from the app.
-
--- ==========================================
--- 9. ENABLE RLS ON ORGANISATIONS TABLE
+-- 7. ENABLE RLS ON ORGANISATIONS TABLE
 -- ==========================================
 
 ALTER TABLE public.organisations ENABLE ROW LEVEL SECURITY;

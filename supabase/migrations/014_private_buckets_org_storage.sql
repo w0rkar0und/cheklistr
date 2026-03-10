@@ -65,7 +65,7 @@ VALUES (
 -- Storage paths follow: {org_id}/{submission_id}/{filename}
 -- The first path segment is the org_id.
 
-CREATE OR REPLACE FUNCTION storage.get_path_org_id(path TEXT)
+CREATE OR REPLACE FUNCTION public.get_path_org_id(path TEXT)
 RETURNS UUID AS $$
 BEGIN
   RETURN (SPLIT_PART(path, '/', 1))::UUID;
@@ -75,7 +75,7 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-COMMENT ON FUNCTION storage.get_path_org_id IS 'Extracts org UUID from first segment of storage path';
+COMMENT ON FUNCTION public.get_path_org_id IS 'Extracts org UUID from first segment of storage path';
 
 -- ==========================================
 -- 5. PHOTO BUCKET POLICIES (ORG-SCOPED)
@@ -92,7 +92,7 @@ CREATE POLICY "Org users can upload vehicle photos"
   WITH CHECK (
     bucket_id = 'vehicle-photos'
     AND auth.uid() IS NOT NULL
-    AND storage.get_path_org_id(name) = public.get_user_org_id()
+    AND public.get_path_org_id(name) = public.get_user_org_id()
   );
 
 CREATE POLICY "Org users can view own org vehicle photos"
@@ -101,8 +101,8 @@ CREATE POLICY "Org users can view own org vehicle photos"
     bucket_id = 'vehicle-photos'
     AND auth.uid() IS NOT NULL
     AND (
-      storage.get_path_org_id(name) = public.get_user_org_id()
-      OR storage.get_path_org_id(name) IS NULL  -- Legacy paths
+      public.get_path_org_id(name) = public.get_user_org_id()
+      OR public.get_path_org_id(name) IS NULL  -- Legacy paths
     )
   );
 
@@ -120,7 +120,7 @@ CREATE POLICY "Org users can upload checklist photos"
   WITH CHECK (
     bucket_id = 'checklist-photos'
     AND auth.uid() IS NOT NULL
-    AND storage.get_path_org_id(name) = public.get_user_org_id()
+    AND public.get_path_org_id(name) = public.get_user_org_id()
   );
 
 CREATE POLICY "Org users can view own org checklist photos"
@@ -129,8 +129,8 @@ CREATE POLICY "Org users can view own org checklist photos"
     bucket_id = 'checklist-photos'
     AND auth.uid() IS NOT NULL
     AND (
-      storage.get_path_org_id(name) = public.get_user_org_id()
-      OR storage.get_path_org_id(name) IS NULL
+      public.get_path_org_id(name) = public.get_user_org_id()
+      OR public.get_path_org_id(name) IS NULL
     )
   );
 
@@ -148,7 +148,7 @@ CREATE POLICY "Org users can upload defect photos"
   WITH CHECK (
     bucket_id = 'defect-photos'
     AND auth.uid() IS NOT NULL
-    AND storage.get_path_org_id(name) = public.get_user_org_id()
+    AND public.get_path_org_id(name) = public.get_user_org_id()
   );
 
 CREATE POLICY "Org users can view own org defect photos"
@@ -157,8 +157,8 @@ CREATE POLICY "Org users can view own org defect photos"
     bucket_id = 'defect-photos'
     AND auth.uid() IS NOT NULL
     AND (
-      storage.get_path_org_id(name) = public.get_user_org_id()
-      OR storage.get_path_org_id(name) IS NULL
+      public.get_path_org_id(name) = public.get_user_org_id()
+      OR public.get_path_org_id(name) IS NULL
     )
   );
 
@@ -187,7 +187,7 @@ CREATE POLICY "Admins can upload org assets"
   WITH CHECK (
     bucket_id = 'org-assets'
     AND public.is_admin()
-    AND storage.get_path_org_id(name) = public.get_user_org_id()
+    AND public.get_path_org_id(name) = public.get_user_org_id()
   );
 
 -- Admins can update their org's assets
@@ -196,7 +196,7 @@ CREATE POLICY "Admins can update org assets"
   USING (
     bucket_id = 'org-assets'
     AND public.is_admin()
-    AND storage.get_path_org_id(name) = public.get_user_org_id()
+    AND public.get_path_org_id(name) = public.get_user_org_id()
   );
 
 -- Admins can delete their org's assets
@@ -205,7 +205,7 @@ CREATE POLICY "Admins can delete org assets"
   USING (
     bucket_id = 'org-assets'
     AND public.is_admin()
-    AND storage.get_path_org_id(name) = public.get_user_org_id()
+    AND public.get_path_org_id(name) = public.get_user_org_id()
   );
 
 -- Super admins can manage all org assets
