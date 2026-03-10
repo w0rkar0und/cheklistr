@@ -50,11 +50,13 @@ async function fillFormToStep(
     timeout: 5_000,
   });
 
-  const photoSlots = page.locator('.photo-slot');
-  const slotCount = await photoSlots.count();
-  for (let i = 0; i < slotCount; i++) {
-    const fileInput = photoSlots.nth(i).locator('input[type="file"]').last();
-    await fileInput.setInputFiles(TEST_IMAGE_PATH);
+  // Upload test image to each photo slot using the gallery input (without capture attribute)
+  const galleryInputs = page.locator('.photo-slot input[type="file"]:not([capture])');
+  const inputCount = await galleryInputs.count();
+  for (let i = 0; i < inputCount; i++) {
+    await galleryInputs.nth(i).setInputFiles(TEST_IMAGE_PATH);
+    // Wait briefly for photo preview to render
+    await page.waitForTimeout(300);
   }
 
   if (targetStep === 'photos') return testVrm;
@@ -95,6 +97,34 @@ async function fillFormToStep(
   });
 
   return testVrm;
+}
+
+/**
+ * Helper: saves current draft and waits for redirect home.
+ */
+async function saveDraftAndGoHome(page: import('@playwright/test').Page) {
+  await page.click('button:has-text("Save Draft")');
+  await expect(page).toHaveURL('/', { timeout: 15_000 });
+  // Wait for draft card to render before interacting
+  await expect(page.locator('.draft-card')).toBeVisible({ timeout: 5_000 });
+}
+
+/**
+ * Helper: clicks Resume on the draft card and waits for the form to fully load.
+ * This ensures the page has mounted, the checklist version is fetched,
+ * and the loading spinner has resolved before returning.
+ */
+async function resumeDraftAndWaitForLoad(page: import('@playwright/test').Page) {
+  await page.click('.draft-card button:has-text("Resume")');
+
+  // 1. Wait for the outer checklist page container to mount
+  await expect(page.locator('.checklist-page')).toBeVisible({ timeout: 15_000 });
+
+  // 2. Wait for the loading spinner to disappear (checklist version fetch)
+  await expect(page.locator('.loading-spinner')).not.toBeVisible({ timeout: 15_000 });
+
+  // 3. Wait for the form step content to render
+  await expect(page.locator('.form-step')).toBeVisible({ timeout: 10_000 });
 }
 
 /**
@@ -190,8 +220,7 @@ test.describe('Save Draft', () => {
 
     const vrm = await fillFormToStep(page, 'review');
 
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
     // Check IndexedDB for the draft
     const draft = (await getDraftFromIndexedDB(page)) as Record<string, unknown> | null;
@@ -208,12 +237,10 @@ test.describe('Save Draft', () => {
 
     const vrm = await fillFormToStep(page, 'review');
 
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
-    // Draft card should be visible
+    // Draft card should be visible (already verified by saveDraftAndGoHome)
     const draftCard = page.locator('.draft-card');
-    await expect(draftCard).toBeVisible({ timeout: 5_000 });
 
     // Should show the VRM
     await expect(draftCard.locator('.draft-vrm')).toContainText(vrm);
@@ -256,22 +283,10 @@ test.describe('Draft Resume', () => {
     await context.setGeolocation({ latitude: 51.5074, longitude: -0.1278 });
 
     const vrm = await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
-    // Click Resume on the draft card
-    await page.click('.draft-card button:has-text("Resume")');
-
-    // Should navigate to checklist form
-    await expect(page.locator('.checklist-page')).toBeVisible({ timeout: 15_000 });
-
-    // Loading should resolve (no infinite spinner)
-    await expect(page.locator('.loading-spinner')).not.toBeVisible({ timeout: 15_000 });
-
-    // Navigate back to step 1 to verify vehicle info was restored
-    // The draft was saved at review step, so we need to go back
-    // First check what step we're on — draft saves currentStep
-    await expect(page.locator('.form-step')).toBeVisible({ timeout: 10_000 });
+    // Click Resume and wait for form to load
+    await resumeDraftAndWaitForLoad(page);
   });
 
   test('resuming draft loads without infinite spinner', async ({ page, context }) => {
@@ -279,19 +294,13 @@ test.describe('Draft Resume', () => {
     await context.setGeolocation({ latitude: 51.5074, longitude: -0.1278 });
 
     await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
-    // Resume the draft
-    await page.click('.draft-card button:has-text("Resume")');
+    // Resume the draft and wait for full load
+    await resumeDraftAndWaitForLoad(page);
 
-    // The page should load without hanging — loading spinner should resolve
-    await expect(page.locator('.form-step').or(page.locator('.form-step-title'))).toBeVisible({
-      timeout: 20_000,
-    });
-
-    // Loading spinner should NOT be visible
-    await expect(page.locator('.loading-spinner')).not.toBeVisible();
+    // Double-check: loading spinner should NOT be visible
+    await expect(page.locator('.loading-spinner')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('discard removes draft from home page and IndexedDB', async ({ page, context }) => {
@@ -299,11 +308,7 @@ test.describe('Draft Resume', () => {
     await context.setGeolocation({ latitude: 51.5074, longitude: -0.1278 });
 
     await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
-
-    // Draft card should be visible
-    await expect(page.locator('.draft-card')).toBeVisible({ timeout: 5_000 });
+    await saveDraftAndGoHome(page);
 
     // Click Discard
     await page.click('.draft-card button:has-text("Discard")');
@@ -322,25 +327,20 @@ test.describe('Draft Resume', () => {
 
     // Save a draft first
     await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
     // Verify draft exists
     let draft = await getDraftFromIndexedDB(page);
     expect(draft).not.toBeNull();
 
-    // Resume the draft
-    await page.click('.draft-card button:has-text("Resume")');
-    await expect(page.locator('.form-step').or(page.locator('.form-step-title'))).toBeVisible({
-      timeout: 20_000,
-    });
+    // Resume the draft and wait for full load
+    await resumeDraftAndWaitForLoad(page);
 
-    // Submit the form (we should be on or near the review step)
+    // Submit the form — we should be on or near the review step
     // Navigate to review if not already there
     const reviewTitle = page.locator('.form-step-title:has-text("Review & Submit")');
     if (!(await reviewTitle.isVisible({ timeout: 3_000 }).catch(() => false))) {
       // May need to navigate forward through steps
-      // Just go to review by clicking through remaining steps
       const continueBtn = page.locator('button:has-text("Continue")').first();
       if (await continueBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
         await continueBtn.click();
@@ -369,8 +369,7 @@ test.describe('Draft Resume', () => {
 
     // Save first draft
     const vrm1 = await fillFormToStep(page, 'review', 'FIRST DFT');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
     // Discard and create a new form with different VRM
     await page.click('.draft-card button:has-text("Discard")');
@@ -378,8 +377,7 @@ test.describe('Draft Resume', () => {
 
     // Save second draft
     const vrm2 = await fillFormToStep(page, 'review', 'SECOND DFT');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
     // Only the second draft should exist
     const draft = (await getDraftFromIndexedDB(page)) as Record<string, unknown> | null;
@@ -402,8 +400,7 @@ test.describe('Draft-Restored Photos', () => {
 
     // Fill form through photos step, then all the way to review, then save draft
     await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
     // Check that draft has photo data
     const draft = (await getDraftFromIndexedDB(page)) as Record<string, unknown> | null;
@@ -423,17 +420,13 @@ test.describe('Draft-Restored Photos', () => {
     await context.setGeolocation({ latitude: 51.5074, longitude: -0.1278 });
 
     await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
-    // Resume the draft
-    await page.click('.draft-card button:has-text("Resume")');
-    await expect(page.locator('.form-step').or(page.locator('.form-step-title'))).toBeVisible({
-      timeout: 20_000,
-    });
+    // Resume the draft and wait for full load
+    await resumeDraftAndWaitForLoad(page);
 
     // Navigate to the photos step (step 2)
-    // We may land on step 1 (vehicle info) after resume — click through
+    // We may land on the saved step — need to navigate to step 2
     const step2Label = page.locator('.form-progress-label:has-text("Step 2")');
     if (!(await step2Label.isVisible({ timeout: 3_000 }).catch(() => false))) {
       // If on step 1, click Continue to Photos
@@ -443,7 +436,7 @@ test.describe('Draft-Restored Photos', () => {
       }
     }
 
-    // On the photos step, photo slots should show previews (img elements) rather than upload prompts
+    // On the photos step, photo slots should show previews (img elements)
     await expect(page.locator('.form-progress-label')).toContainText('Step 2', {
       timeout: 5_000,
     });
@@ -459,17 +452,12 @@ test.describe('Draft-Restored Photos', () => {
 
     // Fill and save a draft
     await fillFormToStep(page, 'review');
-    await page.click('button:has-text("Save Draft")');
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await saveDraftAndGoHome(page);
 
-    // Resume the draft
-    await page.click('.draft-card button:has-text("Resume")');
-    await expect(page.locator('.form-step').or(page.locator('.form-step-title'))).toBeVisible({
-      timeout: 20_000,
-    });
+    // Resume the draft and wait for full load
+    await resumeDraftAndWaitForLoad(page);
 
     // Navigate to review step
-    // The draft saves the currentStep — we may land directly on review or need to navigate
     const reviewTitle = page.locator('.form-step-title:has-text("Review & Submit")');
     if (!(await reviewTitle.isVisible({ timeout: 5_000 }).catch(() => false))) {
       // Navigate forward through steps
