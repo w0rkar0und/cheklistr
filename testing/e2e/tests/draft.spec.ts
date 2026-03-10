@@ -426,20 +426,22 @@ test.describe('Draft-Restored Photos', () => {
     await resumeDraftAndWaitForLoad(page);
 
     // Navigate to the photos step (step 2)
-    // We may land on the saved step — need to navigate to step 2
+    // Draft saves at review (step 5) — we need to go backwards
     const step2Label = page.locator('.form-progress-label:has-text("Step 2")');
     if (!(await step2Label.isVisible({ timeout: 3_000 }).catch(() => false))) {
-      // If on step 1, click Continue to Photos
-      const continuePhotosBtn = page.locator('button:has-text("Continue to Photos")');
-      if (await continuePhotosBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await continuePhotosBtn.click();
+      // Click Back button repeatedly until we reach step 2
+      const backBtn = page.locator('button:has-text("Back")');
+      for (let attempts = 0; attempts < 5; attempts++) {
+        if (await step2Label.isVisible({ timeout: 1_000 }).catch(() => false)) break;
+        if (await backBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+          await backBtn.click();
+          await page.waitForTimeout(500);
+        }
       }
     }
 
-    // On the photos step, photo slots should show previews (img elements)
-    await expect(page.locator('.form-progress-label')).toContainText('Step 2', {
-      timeout: 5_000,
-    });
+    // Should now be on the photos step
+    await expect(step2Label).toBeVisible({ timeout: 5_000 });
 
     // At least one photo preview should be visible
     const previews = page.locator('.photo-slot img');
