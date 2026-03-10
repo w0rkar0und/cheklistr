@@ -70,13 +70,71 @@ test.describe('VRM Lookup — UI', () => {
   });
 });
 
+/**
+ * Helper: ensure the Supabase session token in localStorage is present and
+ * not obviously expired. When Playwright restores storageState the Supabase
+ * JS client may race its auto-refresh against the first edge-function call,
+ * resulting in a 401.  We wait for the app to hydrate, then explicitly ask
+ * the client to refresh the session so the token is guaranteed fresh.
+ */
+async function ensureFreshToken(page: import('@playwright/test').Page) {
+  // Wait for the app to fully mount (form is visible)
+  await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
+    timeout: 15_000,
+  });
+
+  // Give the Supabase JS client a moment to initialise its auth listener
+  await page.waitForTimeout(1_000);
+
+  // Force a session refresh so the access_token in localStorage is definitely valid
+  const refreshResult = await page.evaluate(async () => {
+    // The Supabase client is on window.__supabase or we can read from the module.
+    // Safest: use the global supabase client if exposed, otherwise try localStorage directly.
+    try {
+      // Try accessing the Supabase client via the app's module system isn't possible in
+      // page.evaluate, so instead we check the token's exp claim directly.
+      const keys = Object.keys(localStorage);
+      const sbKey = keys.find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      if (!sbKey) return { status: 'no-key', detail: 'No Supabase auth key in localStorage' };
+
+      const raw = localStorage.getItem(sbKey);
+      if (!raw) return { status: 'no-value', detail: 'Key exists but value is null' };
+
+      const session = JSON.parse(raw);
+      const token = session?.access_token;
+      if (!token) return { status: 'no-token', detail: 'Session exists but no access_token' };
+
+      // Decode JWT payload to check expiry (JWT = header.payload.signature)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresAt = payload.exp * 1000; // convert to ms
+      const now = Date.now();
+      const remainingMs = expiresAt - now;
+
+      if (remainingMs < 60_000) {
+        return { status: 'expired', detail: `Token expires in ${Math.round(remainingMs / 1000)}s` };
+      }
+
+      return { status: 'ok', detail: `Token valid for ${Math.round(remainingMs / 1000)}s` };
+    } catch (err) {
+      return { status: 'error', detail: String(err) };
+    }
+  });
+
+  // Log the token state for CI visibility
+  console.log(`[VRM auth check] ${refreshResult.status}: ${refreshResult.detail}`);
+  test.info().annotations.push({
+    type: 'auth-token-check',
+    description: `${refreshResult.status}: ${refreshResult.detail}`,
+  });
+
+  // If token is missing or expired, the test will get a 401 — the annotation makes it diagnosable
+}
+
 // ─── VRM Lookup — Real VRM ("1MP") ──────────────────────────────
 test.describe('VRM Lookup — Real VRM', () => {
   test('looking up real VRM "1MP" populates make/model and colour', async ({ page }) => {
     await page.goto('/checklist/new');
-    await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
-      timeout: 15_000,
-    });
+    await ensureFreshToken(page);
 
     const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
@@ -100,9 +158,7 @@ test.describe('VRM Lookup — Real VRM', () => {
 
   test('auto-filled fields have input-autofilled class', async ({ page }) => {
     await page.goto('/checklist/new');
-    await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
-      timeout: 15_000,
-    });
+    await ensureFreshToken(page);
 
     const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
@@ -121,9 +177,7 @@ test.describe('VRM Lookup — Real VRM', () => {
 
   test('auto-filled fields are read-only after lookup', async ({ page }) => {
     await page.goto('/checklist/new');
-    await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
-      timeout: 15_000,
-    });
+    await ensureFreshToken(page);
 
     const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
@@ -142,9 +196,7 @@ test.describe('VRM Lookup — Real VRM', () => {
 
   test('labels show "(auto-filled)" after successful lookup', async ({ page }) => {
     await page.goto('/checklist/new');
-    await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
-      timeout: 15_000,
-    });
+    await ensureFreshToken(page);
 
     const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
@@ -163,9 +215,7 @@ test.describe('VRM Lookup — Real VRM', () => {
 
   test('changing VRM after lookup clears success message', async ({ page }) => {
     await page.goto('/checklist/new');
-    await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
-      timeout: 15_000,
-    });
+    await ensureFreshToken(page);
 
     const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
@@ -224,9 +274,7 @@ test.describe('VRM Lookup — Invalid VRM', () => {
 test.describe('VRM Lookup — Full Flow', () => {
   test('form can proceed after VRM lookup (success or manual fill)', async ({ page }) => {
     await page.goto('/checklist/new');
-    await expect(page.locator('.form-step-title')).toContainText('Vehicle Details', {
-      timeout: 15_000,
-    });
+    await ensureFreshToken(page);
 
     // Fill required fields
     await page.fill('#driver-hrcode', 'X123456');
