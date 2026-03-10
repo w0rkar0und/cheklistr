@@ -76,22 +76,16 @@ test.describe('SignedImage — Admin Submission Detail', () => {
   test('submission detail loads photos via SignedImage', async ({ page }) => {
     await page.goto('/admin/submissions');
 
-    // Wait for the submissions page layout (may be .admin-submissions or a broader container)
-    await expect(
-      page
-        .locator('.admin-submissions')
-        .or(page.locator('.admin-layout'))
-    ).toBeVisible({ timeout: 15_000 });
+    // Wait for the submissions page to load
+    await expect(page.locator('.admin-submissions')).toBeVisible({ timeout: 15_000 });
 
     // Wait for table or empty state
-    const table = page.locator('table, .admin-table-container');
-    const emptyState = page.locator('.empty-state, .no-data');
+    const table = page.locator('.admin-submissions table');
+    const emptyState = page.locator('.admin-submissions .empty-state, .admin-submissions .no-data');
     await expect(table.or(emptyState)).toBeVisible({ timeout: 15_000 });
 
     // Only test if we have submission rows
-    const firstRow = page
-      .locator('.clickable-row, table tbody tr')
-      .first();
+    const firstRow = page.locator('.admin-submissions .clickable-row').first();
     if (!(await firstRow.isVisible({ timeout: 3_000 }).catch(() => false))) {
       // No submissions in the table — nothing to test
       console.warn('[E2E] No submissions found — skipping SignedImage detail check');
@@ -101,12 +95,10 @@ test.describe('SignedImage — Admin Submission Detail', () => {
     await firstRow.click();
     await expect(page).toHaveURL(/\/admin\/submissions\/.+/, { timeout: 10_000 });
 
-    // Wait for the detail page — try several common container selectors
+    // Wait for the detail page to render
+    await page.waitForTimeout(2_000);
     await expect(
-      page
-        .locator('.submission-detail')
-        .or(page.locator('.admin-submission-detail'))
-        .or(page.locator('[class*="submission"]'))
+      page.locator('.submission-detail, .admin-submission-detail').first()
     ).toBeVisible({ timeout: 15_000 });
 
     // Look for any images on the detail page — signed URLs contain "token="

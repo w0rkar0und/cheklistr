@@ -280,14 +280,7 @@ test.describe('Storage Buckets', () => {
       'base64'
     );
 
-    // Get the user's auth UID for the storage path (Supabase storage RLS
-    // policies typically scope uploads under the user's auth.uid folder)
-    const jwtPayload = JSON.parse(
-      Buffer.from(userToken.split('.')[1], 'base64').toString()
-    );
-    const authUid = jwtPayload.sub;
-
-    const testPath = `${authUid}/api-test-${Date.now()}.png`;
+    const testPath = `test-uploads/api-test-${Date.now()}.png`;
 
     const res = await fetch(
       `${SUPABASE_URL}/storage/v1/object/vehicle-photos/${testPath}`,
@@ -302,6 +295,10 @@ test.describe('Storage Buckets', () => {
       }
     );
 
+    if (res.status !== 200) {
+      const body = await res.text();
+      console.error(`[E2E] Storage upload failed (${res.status}): ${body}`);
+    }
     expect(res.status).toBe(200);
 
     // Clean up: delete the test file
