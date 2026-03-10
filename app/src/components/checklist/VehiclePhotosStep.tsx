@@ -28,7 +28,10 @@ export function VehiclePhotosStep({
   onBack,
 }: VehiclePhotosStepProps) {
   const capturedCount = REQUIRED_PHOTOS.filter(
-    (p) => vehiclePhotos.get(p.type)?.file !== null && vehiclePhotos.get(p.type)?.file !== undefined
+    (p) => {
+      const entry = vehiclePhotos.get(p.type);
+      return entry?.file != null || entry?.previewUrl != null;
+    }
   ).length;
   const allCaptured = capturedCount === REQUIRED_PHOTOS.length;
 
@@ -113,7 +116,7 @@ function PhotoSlot({ photoType, label, current, onCapture }: PhotoSlotProps) {
     }
   };
 
-  const hasPhoto = current?.file != null;
+  const hasPhoto = current?.file != null || current?.previewUrl != null;
 
   return (
     <div className={`photo-slot ${hasPhoto ? 'photo-slot--captured' : ''}`}>

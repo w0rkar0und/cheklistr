@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Helper: performs VRM lookup and waits for EITHER success or warning.
- * Returns { succeeded, warned } so tests can branch accordingly.
+ * Returns { succeeded, warned, warningText } so tests can branch accordingly.
  */
 async function performLookupAndWait(
   page: import('@playwright/test').Page,
   vrm: string
-): Promise<{ succeeded: boolean; warned: boolean }> {
+): Promise<{ succeeded: boolean; warned: boolean; warningText: string }> {
   await page.fill('#vehicle-reg', vrm);
   const lookupBtn = page.locator('.btn-lookup');
   await expect(lookupBtn).toBeEnabled();
@@ -20,7 +20,8 @@ async function performLookupAndWait(
 
   const succeeded = await success.isVisible().catch(() => false);
   const warned = await warning.isVisible().catch(() => false);
-  return { succeeded, warned };
+  const warningText = warned ? (await warning.textContent() ?? '') : '';
+  return { succeeded, warned, warningText };
 }
 
 // ─── VRM Lookup — Button & UI ───────────────────────────────────
@@ -77,10 +78,14 @@ test.describe('VRM Lookup — Real VRM', () => {
       timeout: 15_000,
     });
 
-    const { succeeded } = await performLookupAndWait(page, '1MP');
+    const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
     if (!succeeded) {
-      test.skip(true, 'VRM lookup did not return success — API may be unavailable in CI');
+      const reason = warned
+        ? `VRM lookup returned warning: ${warningText}`
+        : 'VRM lookup did not return success — no warning or success element appeared';
+      test.info().annotations.push({ type: 'vrm-lookup-failure', description: reason });
+      test.skip(true, reason);
       return;
     }
 
@@ -99,10 +104,14 @@ test.describe('VRM Lookup — Real VRM', () => {
       timeout: 15_000,
     });
 
-    const { succeeded } = await performLookupAndWait(page, '1MP');
+    const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
     if (!succeeded) {
-      test.skip(true, 'VRM lookup did not return success — API may be unavailable in CI');
+      const reason = warned
+        ? `VRM lookup returned warning: ${warningText}`
+        : 'VRM lookup did not return success — no warning or success element appeared';
+      test.info().annotations.push({ type: 'vrm-lookup-failure', description: reason });
+      test.skip(true, reason);
       return;
     }
 
@@ -116,10 +125,14 @@ test.describe('VRM Lookup — Real VRM', () => {
       timeout: 15_000,
     });
 
-    const { succeeded } = await performLookupAndWait(page, '1MP');
+    const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
     if (!succeeded) {
-      test.skip(true, 'VRM lookup did not return success — API may be unavailable in CI');
+      const reason = warned
+        ? `VRM lookup returned warning: ${warningText}`
+        : 'VRM lookup did not return success — no warning or success element appeared';
+      test.info().annotations.push({ type: 'vrm-lookup-failure', description: reason });
+      test.skip(true, reason);
       return;
     }
 
@@ -133,10 +146,14 @@ test.describe('VRM Lookup — Real VRM', () => {
       timeout: 15_000,
     });
 
-    const { succeeded } = await performLookupAndWait(page, '1MP');
+    const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
     if (!succeeded) {
-      test.skip(true, 'VRM lookup did not return success — API may be unavailable in CI');
+      const reason = warned
+        ? `VRM lookup returned warning: ${warningText}`
+        : 'VRM lookup did not return success — no warning or success element appeared';
+      test.info().annotations.push({ type: 'vrm-lookup-failure', description: reason });
+      test.skip(true, reason);
       return;
     }
 
@@ -150,10 +167,14 @@ test.describe('VRM Lookup — Real VRM', () => {
       timeout: 15_000,
     });
 
-    const { succeeded } = await performLookupAndWait(page, '1MP');
+    const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
     if (!succeeded) {
-      test.skip(true, 'VRM lookup did not return success — API may be unavailable in CI');
+      const reason = warned
+        ? `VRM lookup returned warning: ${warningText}`
+        : 'VRM lookup did not return success — no warning or success element appeared';
+      test.info().annotations.push({ type: 'vrm-lookup-failure', description: reason });
+      test.skip(true, reason);
       return;
     }
 
@@ -214,9 +235,13 @@ test.describe('VRM Lookup — Full Flow', () => {
     await page.fill('#mileage', '10000');
 
     // Do the lookup
-    const { succeeded } = await performLookupAndWait(page, '1MP');
+    const { succeeded, warned, warningText } = await performLookupAndWait(page, '1MP');
 
     if (!succeeded) {
+      const reason = warned
+        ? `VRM lookup returned warning: ${warningText}`
+        : 'VRM lookup did not return success — no warning or success element appeared';
+      test.info().annotations.push({ type: 'vrm-lookup-failure', description: reason });
       // Lookup failed — manually fill make/model and colour so form can proceed
       await page.fill('#make-model', 'Manual Make');
       await page.fill('#colour', 'Silver');
