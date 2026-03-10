@@ -113,23 +113,16 @@ final class AppUITests: XCTestCase {
 
     // MARK: – Navigation
 
-    /// After tapping sign-in without valid credentials, the app should
-    /// show an error message rather than navigating away from login.
-    ///
-    /// WKWebView doesn't expose HTML inputs as .textField / .secureTextField
-    /// so we interact via the sign-in button directly (empty credentials
-    /// should still trigger validation) and check for error feedback.
-    func testInvalidLoginShowsError() throws {
+    /// Tapping sign-in with empty fields should NOT navigate away from
+    /// the login screen. The HTML inputs have the `required` attribute,
+    /// so the browser's native validation prevents form submission.
+    /// WKWebView's native validation tooltip isn't visible to XCUITest,
+    /// so instead we verify the app stays on the login page.
+    func testEmptySubmitStaysOnLoginScreen() throws {
         let webView = app.webViews.firstMatch
         _ = webView.waitForExistence(timeout: 15)
 
-        // Strategy: Find the sign-in / log-in button and tap it with
-        // empty fields. The React login form should validate and show
-        // an error message without needing us to type into inputs.
-        //
-        // We search buttons AND static text (some React apps render
-        // <button> as a clickable div that XCUITest sees as staticText
-        // or otherElement rather than a true button).
+        // Find and tap the sign-in button with empty fields.
         let signInButton = webView.buttons.matching(
             NSPredicate(format: "label CONTAINS[c] 'Sign' OR label CONTAINS[c] 'Log'")
         ).firstMatch
@@ -138,39 +131,24 @@ final class AppUITests: XCTestCase {
             NSPredicate(format: "label CONTAINS[c] 'Sign In' OR label CONTAINS[c] 'Log In'")
         ).firstMatch
 
-        var tapped = false
-
         if signInButton.waitForExistence(timeout: 5) {
             signInButton.tap()
-            tapped = true
         } else if signInLink.waitForExistence(timeout: 3) {
             signInLink.tap()
-            tapped = true
-        }
-
-        guard tapped else {
-            // If we can't find a sign-in button at all, skip rather
-            // than fail — the WebView content may not be fully accessible.
-            print("⚠️ Could not locate sign-in button in WebView — skipping assertion")
+        } else {
+            print("⚠️ Could not locate sign-in button in WebView — skipping")
             return
         }
 
-        // After tapping sign-in with empty / no credentials, look for
-        // an error or validation message.
-        let errorText = webView.staticTexts.matching(
-            NSPredicate(format: """
-                label CONTAINS[c] 'invalid' OR \
-                label CONTAINS[c] 'error' OR \
-                label CONTAINS[c] 'incorrect' OR \
-                label CONTAINS[c] 'required' OR \
-                label CONTAINS[c] 'enter'
-            """)
-        ).firstMatch
+        // Wait a moment then confirm we're still on the login screen.
+        // We check for the login-only subtitle rather than "Cheklistr"
+        // which also appears in the app header on post-login pages.
+        sleep(2)
 
-        let errorAppeared = errorText.waitForExistence(timeout: 10)
+        let loginSubtitle = webView.staticTexts["Vehicle Inspection System"]
         XCTAssertTrue(
-            errorAppeared,
-            "A validation or error message should appear after tapping sign-in without credentials"
+            loginSubtitle.exists,
+            "App should remain on the login screen after tapping sign-in with empty fields"
         )
     }
 
