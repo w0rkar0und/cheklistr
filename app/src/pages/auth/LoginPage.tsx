@@ -106,7 +106,7 @@ export function LoginPage() {
               type="text"
               value={orgSlug}
               onChange={(e) => setOrgSlug(e.target.value.toLowerCase().trim())}
-              placeholder="e.g. greythorn"
+              placeholder=""
               required
               autoComplete="organization"
               autoCapitalize="none"
@@ -121,7 +121,7 @@ export function LoginPage() {
               type="text"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value.toUpperCase())}
-              placeholder="e.g. X123456"
+              placeholder=""
               required
               autoComplete="username"
               autoCapitalize="characters"
@@ -136,7 +136,7 @@ export function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder=""
               required
               autoComplete="current-password"
               disabled={loading}
