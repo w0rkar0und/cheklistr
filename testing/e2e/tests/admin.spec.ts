@@ -15,12 +15,14 @@ test.describe('Admin Layout', () => {
     await expect(page.locator('.sidebar-badge')).toContainText(/Admin|Super Admin/);
   });
 
-  test('sidebar shows organisation name', async ({ page }) => {
+  test('sidebar shows organisation name or logo', async ({ page }) => {
     await page.goto('/admin');
-    await expect(page.locator('.sidebar-header')).toBeVisible({ timeout: 15_000 });
-    // With multi-tenancy, the sidebar header shows the org name (or logo)
-    // Greythorn seed data: "Greythorn Contract Logistics"
-    await expect(page.locator('.sidebar-header')).toContainText(/Greythorn|Cheklistr/);
+    const sidebarHeader = page.locator('.sidebar-header');
+    await expect(sidebarHeader).toBeVisible({ timeout: 15_000 });
+    // With multi-tenancy, the sidebar header shows the org name as text OR a logo image
+    const hasText = await sidebarHeader.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
+    const hasLogo = await sidebarHeader.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
+    expect(hasText || hasLogo).toBeTruthy();
   });
 
   test('sidebar has all navigation links', async ({ page }) => {

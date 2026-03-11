@@ -12,16 +12,18 @@ const adminAuthFile = path.join(__dirname, '..', 'test-results', '.auth', 'admin
 
 // ─── Organisation Branding — App Layout ─────────────────────────
 test.describe('Org Branding — App Layout', () => {
-  test('header shows organisation name', async ({ page }) => {
+  test('header shows organisation name or logo', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.home-greeting h2')).toContainText('Welcome', {
       timeout: 15_000,
     });
 
     // Greythorn seed data has org name "Greythorn Contract Logistics"
-    // The header should show the org name (or fallback to "Cheklistr")
+    // The header shows the org name as text OR a logo image with alt text
     const header = page.locator('.app-header');
-    await expect(header).toContainText(/Greythorn|Cheklistr/);
+    const hasText = await header.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
+    const hasLogo = await header.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
+    expect(hasText || hasLogo).toBeTruthy();
   });
 
   test('header shows user full name', async ({ page }) => {
@@ -46,13 +48,15 @@ test.describe('Org Branding — Admin Layout', () => {
     storageState: adminAuthFile,
   });
 
-  test('admin sidebar shows organisation name', async ({ page }) => {
+  test('admin sidebar shows organisation name or logo', async ({ page }) => {
     await page.goto('/admin');
     await expect(page.locator('.admin-layout')).toBeVisible({ timeout: 15_000 });
 
-    // Sidebar header should show "Greythorn Contract Logistics" or org name
+    // Sidebar header should show org name as text OR a logo image with alt text
     const sidebarHeader = page.locator('.sidebar-header');
-    await expect(sidebarHeader).toContainText(/Greythorn|Cheklistr/);
+    const hasText = await sidebarHeader.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
+    const hasLogo = await sidebarHeader.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
+    expect(hasText || hasLogo).toBeTruthy();
   });
 
   test('admin sidebar shows role badge matching user role', async ({ page }) => {
@@ -175,9 +179,9 @@ test.describe('Org Context — Persistence', () => {
       timeout: 15_000,
     });
 
-    // Header should still show the same org context
-    const headerTextAfter = await header.textContent();
-    // Both should contain org identifier (Greythorn or Cheklistr)
-    expect(headerTextAfter).toMatch(/Greythorn|Cheklistr/);
+    // Header should still show the same org context (text or logo)
+    const hasTextAfter = await header.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
+    const hasLogoAfter = await header.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
+    expect(hasTextAfter || hasLogoAfter).toBeTruthy();
   });
 });

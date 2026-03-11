@@ -19,9 +19,11 @@ test.describe('Home Page (authenticated)', () => {
   });
 
   test('header shows organisation name or logo', async ({ page }) => {
-    // Multi-tenancy: header displays org name (Greythorn Contract Logistics) or fallback
+    // Multi-tenancy: header displays org name as text OR logo image with alt text
     const header = page.locator('.app-header');
-    await expect(header).toContainText(/Greythorn|Cheklistr/);
+    const hasText = await header.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
+    const hasLogo = await header.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
+    expect(hasText || hasLogo).toBeTruthy();
   });
 
   test('shows Sign Out button', async ({ page }) => {
