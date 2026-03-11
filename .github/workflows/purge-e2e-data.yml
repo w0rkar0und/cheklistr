@@ -30,12 +30,10 @@ jobs:
 
       - name: Purge database records
         env:
-          SUPABASE_URL: ${{ secrets.E2E_BASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx tsx purge-e2e-data.ts
 
       - name: Purge storage files
         env:
-          SUPABASE_URL: ${{ secrets.E2E_BASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx tsx purge-storage.ts

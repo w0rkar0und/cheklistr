@@ -16,7 +16,8 @@
 
 import 'dotenv/config';
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+// Public Supabase URL — safe to hardcode (RLS + auth enforces security)
+const SUPABASE_URL = process.env.SUPABASE_URL ?? 'https://trlrwnoapvcpszjbntso.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
