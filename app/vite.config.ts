@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'Cheklistr',
         short_name: 'Cheklistr',
-        description: 'Vehicle Inspection Checklist System',
+        description: 'Cheklistr — Never miss a step.',
         theme_color: '#0F172A',
         background_color: '#F1F5F9',
         display: 'standalone',
