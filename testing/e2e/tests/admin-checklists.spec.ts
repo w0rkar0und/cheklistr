@@ -1,35 +1,158 @@
 import { test, expect } from '@playwright/test';
 
-// ─── Checklist Management — Versions List ───────────────────────
-test.describe('Admin Checklist Management — Versions List', () => {
-  test('checklist management page loads', async ({ page }) => {
+// ─── Checklist Management — Checklist List View ────────────────
+test.describe('Admin Checklist Management — Checklist List', () => {
+  test('checklist management page loads with list view', async ({ page }) => {
     await page.goto('/admin/checklists');
     await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.admin-page-header h2')).toContainText('Checklist Management');
   });
 
-  test('displays checklist name in header', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('.admin-count')).toBeVisible();
-  });
-
-  test('shows at least one version card', async ({ page }) => {
+  test('shows at least one checklist card', async ({ page }) => {
     await page.goto('/admin/checklists');
     await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
 
     // Wait for loading to complete
     await expect(
-      page.locator('.version-list').or(page.locator('.empty-state'))
+      page.locator('.checklist-list').or(page.locator('.empty-state'))
     ).toBeVisible({ timeout: 15_000 });
 
-    // Should have at least the active version
+    const cards = page.locator('.checklist-card');
+    await expect(cards.first()).toBeVisible();
+  });
+
+  test('active checklist has Active badge', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    const activeCard = page.locator('.checklist-card--active');
+    await expect(activeCard.first()).toBeVisible();
+    await expect(activeCard.first().locator('.version-badge--active')).toContainText('Active');
+  });
+
+  test('checklist cards show name, version count, and date', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    const firstCard = page.locator('.checklist-card').first();
+    await expect(firstCard.locator('.checklist-card-name')).toBeVisible();
+    await expect(firstCard.locator('.checklist-card-meta')).toContainText(/\d+ version/);
+    await expect(firstCard.locator('.checklist-card-meta')).toContainText(/Created/);
+  });
+
+  test('active checklist card has Manage Versions button', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    const activeCard = page.locator('.checklist-card--active').first();
+    await expect(activeCard.locator('.btn-primary.btn-small:has-text("Manage Versions")')).toBeVisible();
+  });
+
+  test('inactive checklist card has Activate and Delete buttons', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    // Only run if there's an inactive checklist
+    const inactiveCard = page.locator('.checklist-card:not(.checklist-card--active)');
+    if (await inactiveCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await expect(inactiveCard.first().locator('.btn-secondary.btn-small:has-text("Activate")')).toBeVisible();
+      await expect(inactiveCard.first().locator('.btn-danger.btn-small:has-text("Delete")')).toBeVisible();
+    }
+  });
+
+  test('New Checklist button is present', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
+
+    const createBtn = page.locator('.admin-page-header .btn-primary:has-text("+ New Checklist")');
+    await expect(createBtn).toBeVisible();
+  });
+
+  test('clicking New Checklist shows create form', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.admin-page-header .btn-primary:has-text("+ New Checklist")').click();
+    await expect(page.locator('.admin-card h3')).toContainText('Create New Checklist');
+    await expect(page.locator('#checklist-name')).toBeVisible();
+  });
+});
+
+// ─── Checklist Management — Create & Delete Checklist ──────────
+test.describe('Admin Checklist Management — Create & Delete', () => {
+  test('can create and delete a test checklist', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    const cardCountBefore = await page.locator('.checklist-card').count();
+
+    // Open create form
+    await page.locator('.admin-page-header .btn-primary:has-text("+ New Checklist")').click();
+    await expect(page.locator('#checklist-name')).toBeVisible();
+
+    // Fill and submit
+    await page.locator('#checklist-name').fill('E2E Test Checklist');
+    await page.locator('button[type="submit"]:has-text("Create Checklist")').click();
+
+    // Wait for list to reload with new card
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.checklist-card')).toHaveCount(cardCountBefore + 1, { timeout: 10_000 });
+
+    // Find the new card by name
+    const newCard = page.locator('.checklist-card', { has: page.locator('.checklist-card-name:has-text("E2E Test Checklist")') });
+    await expect(newCard).toBeVisible();
+    await expect(newCard.locator('.checklist-card-meta')).toContainText('1 version');
+
+    // Delete it (should not be active, so Delete button exists)
+    let dialogHandled = false;
+    page.once('dialog', async (dialog) => {
+      dialogHandled = true;
+      await dialog.accept();
+    });
+    await newCard.locator('.btn-danger.btn-small:has-text("Delete")').click();
+    expect(dialogHandled).toBe(true);
+
+    // Wait for reload
+    await page.waitForTimeout(2_000);
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.checklist-card')).toHaveCount(cardCountBefore, { timeout: 10_000 });
+  });
+});
+
+// ─── Checklist Management — Navigate to Versions ───────────────
+test.describe('Admin Checklist Management — Versions List', () => {
+  test('clicking Manage Versions shows version list with back button', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    const activeCard = page.locator('.checklist-card--active').first();
+    await activeCard.locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
+    // Should see versions list with back navigation
+    await expect(page.locator('.btn-back:has-text("Back to Checklists")')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.version-list').or(page.locator('.empty-state'))).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('shows at least one version card', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
+    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+
     const cards = page.locator('.version-card');
     await expect(cards.first()).toBeVisible();
   });
 
   test('active version has correct badge', async ({ page }) => {
     await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
     await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
 
     const activeBadge = page.locator('.version-badge--active');
@@ -39,6 +162,11 @@ test.describe('Admin Checklist Management — Versions List', () => {
 
   test('active version card has View button', async ({ page }) => {
     await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
     await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
 
     const activeCard = page.locator('.version-card--active').first();
@@ -48,136 +176,116 @@ test.describe('Admin Checklist Management — Versions List', () => {
     await expect(viewBtn).toBeVisible();
   });
 
-  test('version cards show version number', async ({ page }) => {
+  test('version cards show version number and date', async ({ page }) => {
     await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
     await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
 
     const versionNumber = page.locator('.version-number').first();
     await expect(versionNumber).toBeVisible();
     await expect(versionNumber).toContainText(/Version \d+/);
-  });
-
-  test('version cards show date metadata', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
 
     const meta = page.locator('.version-card-meta').first();
-    await expect(meta).toBeVisible();
-    // Should contain either "Published" or "Created"
     await expect(meta).toContainText(/Published|Created/);
   });
 
   test('Create New Draft button is present', async ({ page }) => {
     await page.goto('/admin/checklists');
-    await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
 
-    const toolbar = page.locator('.admin-toolbar');
-    await expect(toolbar).toBeVisible();
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
 
-    const createBtn = toolbar.locator('.btn-primary');
+    await expect(page.locator('.admin-toolbar')).toBeVisible({ timeout: 15_000 });
+
+    const createBtn = page.locator('.admin-toolbar .btn-primary');
     await expect(createBtn).toBeVisible();
+  });
+
+  test('Back to Checklists returns to list view', async ({ page }) => {
+    await page.goto('/admin/checklists');
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
+    await expect(page.locator('.btn-back:has-text("Back to Checklists")')).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('.btn-back:has-text("Back to Checklists")').click();
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 10_000 });
   });
 });
 
 // ─── Checklist Management — Version Editor (Read-Only) ──────────
 test.describe('Admin Checklist Management — View Active Version', () => {
-  test('clicking View opens the version editor', async ({ page }) => {
+  // Helper: navigate from list → versions → editor for active version
+  async function navigateToActiveEditor(page: import('@playwright/test').Page) {
     await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
 
-    const activeCard = page.locator('.version-card--active').first();
-    const viewBtn = activeCard.locator('.btn-secondary.btn-small:has-text("View")');
-    await viewBtn.click();
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
 
-    // Editor should open
-    await expect(page.locator('.editor-top-bar')).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('editor shows version number and Active badge', async ({ page }) => {
-    await page.goto('/admin/checklists');
     await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
 
     const activeCard = page.locator('.version-card--active').first();
     await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
 
     await expect(page.locator('.editor-top-bar')).toBeVisible({ timeout: 10_000 });
+  }
+
+  test('clicking View opens the version editor', async ({ page }) => {
+    await navigateToActiveEditor(page);
+  });
+
+  test('editor shows version number and Active badge', async ({ page }) => {
+    await navigateToActiveEditor(page);
     await expect(page.locator('.editor-title h2')).toContainText(/Version \d+/);
     await expect(page.locator('.version-badge--active')).toBeVisible();
   });
 
   test('editor shows section and item counts', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.editor-stats')).toBeVisible({ timeout: 10_000 });
+    await navigateToActiveEditor(page);
     await expect(page.locator('.editor-stats')).toContainText(/\d+ section/);
     await expect(page.locator('.editor-stats')).toContainText(/\d+ item/);
   });
 
   test('editor shows all 5 sections', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
+    await navigateToActiveEditor(page);
     await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
-
-    const sections = page.locator('.section-editor');
-    await expect(sections).toHaveCount(5);
+    await expect(page.locator('.section-editor')).toHaveCount(5);
   });
 
   test('sections have names and item counts', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
-
+    await navigateToActiveEditor(page);
     const firstSection = page.locator('.section-editor').first();
     await expect(firstSection.locator('.section-name-display')).toBeVisible();
     await expect(firstSection.locator('.section-item-count')).toContainText(/\d+ items?/);
   });
 
   test('section expand/collapse toggle works', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
-
+    await navigateToActiveEditor(page);
     const firstSection = page.locator('.section-editor').first();
     const toggleBtn = firstSection.locator('.section-expand-btn');
 
-    // Sections start collapsed — items NOT visible
+    // Sections start collapsed
     await expect(firstSection.locator('.section-items')).not.toBeVisible();
 
     // Expand
     await toggleBtn.click();
     await expect(firstSection.locator('.section-items')).toBeVisible();
 
-    // Collapse again
+    // Collapse
     await toggleBtn.click();
     await expect(firstSection.locator('.section-items')).not.toBeVisible();
   });
 
   test('items show labels and field type badges', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
-
-    // Sections start collapsed — expand the first section
+    await navigateToActiveEditor(page);
     const firstSection = page.locator('.section-editor').first();
     await firstSection.locator('.section-expand-btn').click();
     await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
@@ -187,93 +295,69 @@ test.describe('Admin Checklist Management — View Active Version', () => {
     await expect(firstItem.locator('.field-type-badge')).toBeVisible();
   });
 
-  test('items show required and defect badges where applicable', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+  test('items show required badges where applicable', async ({ page }) => {
+    await navigateToActiveEditor(page);
 
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
-
-    // Sections start collapsed — expand all sections to find required badges
+    // Expand all sections
     const sections = page.locator('.section-editor');
     const count = await sections.count();
     for (let i = 0; i < count; i++) {
       await sections.nth(i).locator('.section-expand-btn').click();
     }
 
-    // Wait for items to appear
     await expect(page.locator('.item-row').first()).toBeVisible({ timeout: 5_000 });
-
-    // At least some items should have the Required badge
-    const requiredBadges = page.locator('.item-badge--required');
-    await expect(requiredBadges.first()).toBeVisible();
+    await expect(page.locator('.item-badge--required').first()).toBeVisible();
   });
 
   test('read-only mode hides edit controls', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
-
-    // In read-only mode, these should NOT be visible
+    await navigateToActiveEditor(page);
     await expect(page.locator('button:has-text("+ Add Section")')).not.toBeVisible();
     await expect(page.locator('.btn-add-item')).not.toBeVisible();
     await expect(page.locator('.btn-publish')).not.toBeVisible();
   });
 
   test('Back button returns to versions list', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-    const activeCard = page.locator('.version-card--active').first();
-    await activeCard.locator('.btn-secondary.btn-small:has-text("View")').click();
-
-    await expect(page.locator('.editor-top-bar')).toBeVisible({ timeout: 10_000 });
-
-    // Click back
+    await navigateToActiveEditor(page);
     await page.locator('.btn-back').click();
-
-    // Should return to versions list
     await expect(page.locator('.version-list')).toBeVisible({ timeout: 10_000 });
   });
 });
 
 // ─── Checklist Management — Draft Workflow ──────────────────────
 test.describe('Admin Checklist Management — Draft Workflow', () => {
-  test('can create a new draft version', async ({ page }) => {
+  // Helper: navigate to versions view for the active checklist
+  async function navigateToVersions(page: import('@playwright/test').Page) {
     await page.goto('/admin/checklists');
-    await expect(page.locator('.admin-checklists')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.checklist-list')).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('.checklist-card--active').first()
+      .locator('.btn-primary.btn-small:has-text("Manage Versions")').click();
+
+    await expect(page.locator('.version-list').or(page.locator('.empty-state'))).toBeVisible({ timeout: 15_000 });
+  }
+
+  test('can create a new draft version', async ({ page }) => {
+    await navigateToVersions(page);
 
     const createBtn = page.locator('.admin-toolbar .btn-primary');
     await expect(createBtn).toBeVisible();
 
-    // If a draft already exists, the button is disabled
     const isDisabled = await createBtn.isDisabled();
 
     if (!isDisabled) {
       await createBtn.click();
-
-      // Should transition to editor view with draft badge
       await expect(page.locator('.editor-top-bar')).toBeVisible({ timeout: 10_000 });
       await expect(page.locator('.version-badge--draft')).toBeVisible();
     } else {
-      // Draft already exists — button text should indicate this
       await expect(createBtn).toContainText('Draft exists');
     }
   });
 
   test('draft version has Edit, Publish, and Delete buttons', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
-    // Only run this test if a draft exists
     if (await draftCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await expect(draftCard.locator('.btn-primary.btn-small:has-text("Edit")')).toBeVisible();
       await expect(draftCard.locator('.btn-publish.btn-small:has-text("Publish")')).toBeVisible();
@@ -282,8 +366,7 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
   });
 
   test('editing a draft opens editor in editable mode', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
@@ -293,23 +376,19 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await expect(page.locator('.editor-top-bar')).toBeVisible({ timeout: 10_000 });
       await expect(page.locator('.version-badge--draft')).toBeVisible();
 
-      // Edit mode should show Add Section button
       await expect(page.locator('button:has-text("+ Add Section")')).toBeVisible();
 
-      // Expand a section to see Add Item button (sections start collapsed)
       const firstSection = page.locator('.section-editor').first();
       await firstSection.locator('.section-expand-btn').click();
       await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
       await expect(firstSection.locator('.btn-add-item')).toBeVisible();
 
-      // Publish button should be visible in editor top bar
       await expect(page.locator('.editor-top-bar .btn-publish')).toBeVisible();
     }
   });
 
   test('draft editor allows adding a new section', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
@@ -318,18 +397,13 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
       const sectionCountBefore = await page.locator('.section-editor').count();
-
-      // Add a new section
       await page.locator('button:has-text("+ Add Section")').click();
-
-      // Should have one more section
       await expect(page.locator('.section-editor')).toHaveCount(sectionCountBefore + 1);
     }
   });
 
   test('draft editor allows adding a new item to a section', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
@@ -337,25 +411,20 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
-      // Expand the first section (sections start collapsed)
       const firstSection = page.locator('.section-editor').first();
       await firstSection.locator('.section-expand-btn').click();
       await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
       const itemCountBefore = await firstSection.locator('.item-row').count();
-
-      // Click Add Item in first section
       await firstSection.locator('.btn-add-item').click();
 
-      // New item appears as an item-row with label "New Item" (editor not auto-opened)
       await expect(firstSection.locator('.item-row')).toHaveCount(itemCountBefore + 1, { timeout: 5_000 });
       await expect(firstSection.locator('.item-row').last().locator('.item-label')).toHaveText('New Item');
     }
   });
 
   test('item editor form has all fields', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
@@ -363,39 +432,29 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
-      // Expand first section (sections start collapsed)
       const firstSection = page.locator('.section-editor').first();
       await firstSection.locator('.section-expand-btn').click();
       await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
-      // Click Edit on first item
       const firstItem = page.locator('.item-row').first();
       await firstItem.locator('.btn-secondary.btn-small:has-text("Edit")').click();
 
-      // Item editor should appear with fields
       const editor = page.locator('.item-editor-form');
       await expect(editor).toBeVisible({ timeout: 5_000 });
-
-      // Label input
       await expect(editor.locator('.item-editor-input').first()).toBeVisible();
-
-      // Type select
       await expect(editor.locator('.item-editor-select').first()).toBeVisible();
 
-      // Required and Triggers Defect checkboxes — count includes those in ConfigEditor too
       const checkboxes = editor.locator('.item-editor-checkbox');
       await expect(checkboxes.first()).toBeVisible();
       expect(await checkboxes.count()).toBeGreaterThanOrEqual(2);
 
-      // Save and Cancel buttons
       await expect(editor.locator('.btn-primary.btn-small:has-text("Save")')).toBeVisible();
       await expect(editor.locator('.btn-secondary.btn-small:has-text("Cancel")')).toBeVisible();
     }
   });
 
   test('item editor Cancel discards changes', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
@@ -403,29 +462,23 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
-      // Expand first section (sections start collapsed)
       const firstSection = page.locator('.section-editor').first();
       await firstSection.locator('.section-expand-btn').click();
       await expect(firstSection.locator('.section-items')).toBeVisible({ timeout: 5_000 });
 
-      // Click Edit on first item
       const firstItem = page.locator('.item-row').first();
       await firstItem.locator('.btn-secondary.btn-small:has-text("Edit")').click();
 
       const editor = page.locator('.item-editor-form');
       await expect(editor).toBeVisible({ timeout: 5_000 });
 
-      // Click Cancel
       await editor.locator('.btn-secondary.btn-small:has-text("Cancel")').click();
-
-      // Editor should close
       await expect(editor).not.toBeVisible();
     }
   });
 
   test('section reorder buttons are visible in draft mode', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
@@ -433,29 +486,24 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       await draftCard.locator('.btn-primary.btn-small:has-text("Edit")').click();
       await expect(page.locator('.sections-list')).toBeVisible({ timeout: 10_000 });
 
-      // Reorder buttons should be visible on sections
       const reorderBtns = page.locator('.section-header-actions .reorder-btn');
       await expect(reorderBtns.first()).toBeVisible();
 
-      // First section's up button should be disabled
       const firstSection = page.locator('.section-editor').first();
       const upBtn = firstSection.locator('.reorder-btn:has-text("↑")');
       await expect(upBtn).toBeDisabled();
     }
   });
 
-  // ⚠️ MUST remain the LAST test in this block — it deletes the draft version
+  // MUST remain the LAST test in this block — it deletes the draft version
   test('deleting a draft version removes it from the list', async ({ page }) => {
-    await page.goto('/admin/checklists');
-    await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
+    await navigateToVersions(page);
 
     const draftCard = page.locator('.version-card--draft');
 
     if (await draftCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
       const versionCountBefore = await page.locator('.version-card').count();
 
-      // Register handler before click — window.confirm blocks JS so click
-      // won't resolve until the dialog is dismissed by this handler
       let dialogHandled = false;
       page.once('dialog', async (dialog) => {
         dialogHandled = true;
@@ -463,13 +511,10 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
       });
       await draftCard.locator('.btn-danger.btn-small:has-text("Delete")').click();
 
-      // Verify the dialog was actually handled
       expect(dialogHandled).toBe(true);
 
-      // Wait for any loading cycle to complete
       await page.waitForTimeout(2_000);
 
-      // Check if an error message appeared (indicates delete failed at DB level)
       const errorMsg = page.locator('.error-message');
       const hasError = await errorMsg.isVisible().catch(() => false);
       if (hasError) {
@@ -477,13 +522,8 @@ test.describe('Admin Checklist Management — Draft Workflow', () => {
         throw new Error(`Delete failed with DB error: ${errorText}`);
       }
 
-      // Wait for the version list to reload (loading state hides it briefly)
       await expect(page.locator('.version-list')).toBeVisible({ timeout: 15_000 });
-
-      // Draft card should no longer exist after reload
       await expect(page.locator('.version-card--draft')).toHaveCount(0, { timeout: 5_000 });
-
-      // Create New Draft button should be enabled again (no draft exists)
       await expect(page.locator('.btn-primary:has-text("Create New Draft")')).toBeEnabled();
     }
   });

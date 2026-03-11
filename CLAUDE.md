@@ -128,16 +128,22 @@ Full schema detail: see `supabase/CLAUDE.md`.
 - **AdminOrganisations.tsx**: Added `noValidate` to create and edit `<form>` elements so JS validation renders `.error-message` divs instead of browser-native tooltips.
 - **multi-tenancy.spec.ts**: SignedImage detail test skips on mobile viewport (sidebar overlays table rows).
 - **NewChecklistPage.tsx** (Phase 1 fix): Direct submit path now matches offline sync path — `org_id` in submission row, org-prefixed storage paths, storage paths stored instead of public URLs.
+- **global.css** (Phase 2): All 27 `var(--color-primary)` refs replaced with `var(--org-primary, var(--color-primary))` — cascades from inline style set by AppLayout/AdminLayout.
+- **AdminOrganisations.tsx** (Phase 2): Logo upload/remove in edit form, logo preview column in org table. Uploads to `org-assets/{org_id}/logo.{ext}`.
+- **AdminChecklists.tsx** (Phase 3): Restructured to three-level view: checklist list → version management → version editor. Admins can create new checklists, activate/deactivate, delete inactive. No schema changes needed.
+- **admin-checklists.spec.ts** (Phase 3): Rewritten E2E tests for new checklist list UI, create/delete flow, and navigation between list → versions → editor.
+- **e2e-tests.yml**: Vercel deploy wait reduced from 180s to 60s.
 
 ### What's fixed
 - Admin suite: 30/30 passing (was 0/30 — missing credentials)
 - Multi-tenancy suite: 24/24 passing, 1 skipped (was 7/23 — missing admin auth state)
 - Super-admin suite: 23/23 passing (was 0/23 — missing credentials). `noValidate` fix confirmed in CI after deploy.
 - Direct (online) submission path: org_id, photo storage paths, and defect image URLs now org-scoped (was broken for any non-legacy org).
+- Phase 2 complete: Dynamic org branding (CSS custom property cascade) and logo upload UI. All E2E suites green.
+- Phase 3 complete: Checklist assignment UI — admins can list, create, activate, and delete checklists per org. Version management accessible from checklist list. E2E tests rewritten for new three-level flow (list → versions → editor).
 
 ### What's next
-- Phase 2: Dynamic org branding — wire `organisations.primary_colour` into CSS, build logo upload UI.
-- Phase 3: Checklist assignment UI per org.
+- Phase 4 (optional): Add `org_id` directly to `defects` and `submission_photos` tables for query performance.
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
 
 ---

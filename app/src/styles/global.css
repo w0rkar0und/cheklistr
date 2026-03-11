@@ -2082,6 +2082,50 @@ button:disabled {
    CHECKLIST MANAGEMENT — VERSION LIST
    ========================================== */
 
+.checklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.checklist-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.checklist-card--active {
+  border-color: var(--color-success);
+  border-width: 2px;
+}
+
+.checklist-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.checklist-card-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--org-primary, var(--color-primary));
+}
+
+.checklist-card-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.checklist-card-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
 .version-list {
   display: flex;
   flex-direction: column;

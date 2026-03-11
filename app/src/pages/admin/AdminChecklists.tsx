@@ -18,7 +18,11 @@ import type {
 // ============================================================
 // View Types
 // ============================================================
-type View = 'versions' | 'editor';
+type View = 'list' | 'versions' | 'editor';
+
+interface ChecklistWithVersionCount extends Checklist {
+  version_count: number;
+}
 
 interface FullSection extends ChecklistSection {
   items: ChecklistItem[];
@@ -29,11 +33,17 @@ interface FullSection extends ChecklistSection {
 // ============================================================
 export function AdminChecklists() {
   const profile = useAuthStore((s) => s.profile);
-  const [view, setView] = useState<View>('versions');
-  const [checklist, setChecklist] = useState<Checklist | null>(null);
+  const [view, setView] = useState<View>('list');
+  const [checklists, setChecklists] = useState<ChecklistWithVersionCount[]>([]);
+  const [selectedChecklist, setSelectedChecklist] = useState<Checklist | null>(null);
   const [versions, setVersions] = useState<ChecklistVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Create checklist form
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newChecklistName, setNewChecklistName] = useState('');
+  const [createLoading, setCreateLoading] = useState(false);
 
   // Editor state
   const [editingVersion, setEditingVersion] = useState<ChecklistVersion | null>(null);
@@ -41,30 +51,175 @@ export function AdminChecklists() {
   const [editorLoading, setEditorLoading] = useState(false);
   const [isReadOnly, setIsReadOnly] = useState(false);
 
-  // ── Load checklist + versions ──
-  const loadVersions = useCallback(async () => {
+  // ── Load all checklists for this org ──
+  const loadChecklists = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const { data: checklists, error: clErr } = await supabase
+    const { data, error: clErr } = await supabase
       .from('checklists')
       .select('*')
-      .eq('is_active', true)
-      .limit(1);
+      .order('created_at', { ascending: true });
 
-    if (clErr || !checklists?.length) {
-      setError('No active checklist found');
+    if (clErr) {
+      setError(clErr.message);
       setLoading(false);
       return;
     }
 
-    const cl = checklists[0] as Checklist;
-    setChecklist(cl);
+    const cls = (data ?? []) as Checklist[];
+
+    // Fetch version counts
+    const withCounts: ChecklistWithVersionCount[] = [];
+    for (const cl of cls) {
+      const { count } = await supabase
+        .from('checklist_versions')
+        .select('*', { count: 'exact', head: true })
+        .eq('checklist_id', cl.id);
+
+      withCounts.push({ ...cl, version_count: count ?? 0 });
+    }
+
+    setChecklists(withCounts);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadChecklists();
+  }, [loadChecklists]);
+
+  // ── Create new checklist ──
+  const handleCreateChecklist = async () => {
+    if (!profile || !newChecklistName.trim()) return;
+    setCreateLoading(true);
+    setError(null);
+
+    try {
+      const { data: newCl, error: clErr } = await supabase
+        .from('checklists')
+        .insert({
+          org_id: profile.org_id,
+          name: newChecklistName.trim(),
+          is_active: false,
+        })
+        .select()
+        .single();
+
+      if (clErr || !newCl) throw new Error(clErr?.message ?? 'Failed to create checklist');
+
+      // Create an initial version (v1, active)
+      const { error: vErr } = await supabase
+        .from('checklist_versions')
+        .insert({
+          checklist_id: newCl.id,
+          version_number: 1,
+          is_active: true,
+        });
+
+      if (vErr) throw new Error(vErr.message);
+
+      setNewChecklistName('');
+      setShowCreateForm(false);
+      await loadChecklists();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create checklist');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  // ── Activate a checklist ──
+  const handleActivate = async (checklist: Checklist) => {
+    setError(null);
+
+    try {
+      // Deactivate all checklists in this org (RLS scopes to user's org)
+      const { error: deactErr } = await supabase
+        .from('checklists')
+        .update({ is_active: false })
+        .eq('is_active', true);
+
+      if (deactErr) throw new Error(deactErr.message);
+
+      // Activate the selected one
+      const { error: actErr } = await supabase
+        .from('checklists')
+        .update({ is_active: true })
+        .eq('id', checklist.id);
+
+      if (actErr) throw new Error(actErr.message);
+
+      await loadChecklists();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to activate checklist');
+    }
+  };
+
+  // ── Delete a checklist ──
+  const handleDeleteChecklist = async (checklist: Checklist) => {
+    if (checklist.is_active) return;
+    if (!window.confirm(`Delete "${checklist.name}" and all its versions? This cannot be undone.`)) return;
+
+    setError(null);
+
+    try {
+      // Get all versions
+      const { data: vers } = await supabase
+        .from('checklist_versions')
+        .select('id')
+        .eq('checklist_id', checklist.id);
+
+      if (vers && vers.length > 0) {
+        const versionIds = vers.map((v: { id: string }) => v.id);
+
+        // Get all sections for these versions
+        const { data: secs } = await supabase
+          .from('checklist_sections')
+          .select('id')
+          .in('checklist_version_id', versionIds);
+
+        if (secs && secs.length > 0) {
+          const sectionIds = secs.map((s: { id: string }) => s.id);
+
+          // Delete items → sections
+          await supabase.from('checklist_items').delete().in('section_id', sectionIds).select();
+          await supabase.from('checklist_sections').delete().in('checklist_version_id', versionIds).select();
+        }
+
+        // Delete versions
+        await supabase.from('checklist_versions').delete().eq('checklist_id', checklist.id).select();
+      }
+
+      // Delete checklist
+      const { error: delErr } = await supabase
+        .from('checklists')
+        .delete()
+        .eq('id', checklist.id);
+
+      if (delErr) throw new Error(delErr.message);
+
+      await loadChecklists();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete checklist');
+    }
+  };
+
+  // ── Navigate to version management for a checklist ──
+  const handleManageVersions = async (checklist: Checklist) => {
+    setSelectedChecklist(checklist);
+    setView('versions');
+    await loadVersions(checklist.id);
+  };
+
+  // ── Load versions for a specific checklist ──
+  const loadVersions = async (checklistId: string) => {
+    setLoading(true);
+    setError(null);
 
     const { data: vers, error: vErr } = await supabase
       .from('checklist_versions')
       .select('*')
-      .eq('checklist_id', cl.id)
+      .eq('checklist_id', checklistId)
       .order('version_number', { ascending: false });
 
     if (vErr) {
@@ -73,11 +228,7 @@ export function AdminChecklists() {
       setVersions((vers ?? []) as ChecklistVersion[]);
     }
     setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    loadVersions();
-  }, [loadVersions]);
+  };
 
   // ── Load version for editing ──
   const loadVersionEditor = useCallback(async (version: ChecklistVersion, readOnly: boolean) => {
@@ -135,7 +286,7 @@ export function AdminChecklists() {
 
   // ── Clone active version as draft ──
   const handleClone = async () => {
-    if (!checklist || !profile) return;
+    if (!selectedChecklist || !profile) return;
 
     const activeVersion = versions.find((v) => v.is_active);
     if (!activeVersion) {
@@ -160,7 +311,7 @@ export function AdminChecklists() {
       const { data: newVer, error: vErr } = await supabase
         .from('checklist_versions')
         .insert({
-          checklist_id: checklist.id,
+          checklist_id: selectedChecklist.id,
           version_number: newVersionNumber,
           is_active: false,
         })
@@ -211,7 +362,7 @@ export function AdminChecklists() {
         }
       }
 
-      await loadVersions();
+      await loadVersions(selectedChecklist.id);
       await loadVersionEditor(newVer as ChecklistVersion, false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Clone failed');
@@ -221,7 +372,7 @@ export function AdminChecklists() {
 
   // ── Publish a draft version ──
   const handlePublish = async (version: ChecklistVersion) => {
-    if (!checklist || !profile) return;
+    if (!selectedChecklist || !profile) return;
     if (!window.confirm(`Publish Version ${version.version_number}? This will make it the active checklist for all users.`)) return;
 
     setLoading(true);
@@ -232,7 +383,7 @@ export function AdminChecklists() {
       const { error: deactErr } = await supabase
         .from('checklist_versions')
         .update({ is_active: false })
-        .eq('checklist_id', checklist.id);
+        .eq('checklist_id', selectedChecklist.id);
 
       if (deactErr) throw new Error(deactErr.message);
 
@@ -248,7 +399,7 @@ export function AdminChecklists() {
 
       if (actErr) throw new Error(actErr.message);
 
-      await loadVersions();
+      await loadVersions(selectedChecklist.id);
       setView('versions');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Publish failed');
@@ -259,33 +410,27 @@ export function AdminChecklists() {
   // ── Delete a draft version ──
   const handleDeleteVersion = async (version: ChecklistVersion) => {
     if (version.is_active) return;
+    if (!selectedChecklist) return;
     if (!window.confirm(`Delete draft Version ${version.version_number}? This cannot be undone.`)) return;
 
     setLoading(true);
     try {
       // Manual cascade: items → sections → version
-      // Using .select() on each delete to verify rows were actually affected
-      // (Supabase RLS silently returns 200 with 0 rows if policy blocks the delete)
-
-      // 1. Get section IDs for this version
-      const { data: sections } = await supabase
+      const { data: sectionData } = await supabase
         .from('checklist_sections')
         .select('id')
         .eq('checklist_version_id', version.id);
 
-      if (sections && sections.length > 0) {
-        const sectionIds = sections.map((s: { id: string }) => s.id);
+      if (sectionData && sectionData.length > 0) {
+        const sectionIds = sectionData.map((s: { id: string }) => s.id);
 
-        // 2. Delete all items in those sections
         const { error: itemsErr } = await supabase
           .from('checklist_items')
           .delete()
           .in('section_id', sectionIds)
           .select();
         if (itemsErr) throw itemsErr;
-        // Items may legitimately be 0 if sections were empty, so no count check here
 
-        // 3. Delete all sections for this version
         const { data: deletedSections, error: sectionsErr } = await supabase
           .from('checklist_sections')
           .delete()
@@ -297,7 +442,6 @@ export function AdminChecklists() {
         }
       }
 
-      // 4. Delete the version itself
       const { data: deletedVersion, error: versionErr } = await supabase
         .from('checklist_versions')
         .delete()
@@ -308,19 +452,28 @@ export function AdminChecklists() {
         throw new Error('Failed to delete version — check RLS policies');
       }
 
-      await loadVersions();
+      await loadVersions(selectedChecklist.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
     }
     setLoading(false);
   };
 
-  // ── Back to versions list ──
+  // ── Back navigation ──
+  const handleBackToList = () => {
+    setView('list');
+    setSelectedChecklist(null);
+    setVersions([]);
+    loadChecklists();
+  };
+
   const handleBackToVersions = () => {
     setView('versions');
     setEditingVersion(null);
     setSections([]);
-    loadVersions();
+    if (selectedChecklist) {
+      loadVersions(selectedChecklist.id);
+    }
   };
 
   // ==============================
@@ -506,7 +659,7 @@ export function AdminChecklists() {
   // Render
   // ==============================
 
-  if (loading) {
+  if (loading && view !== 'editor') {
     return (
       <div className="loading-screen" style={{ minHeight: 'auto', padding: '2rem 0' }}>
         <div className="loading-spinner" />
@@ -514,6 +667,7 @@ export function AdminChecklists() {
     );
   }
 
+  // ── Editor View ──
   if (view === 'editor' && editingVersion) {
     return (
       <VersionEditor
@@ -536,87 +690,194 @@ export function AdminChecklists() {
     );
   }
 
-  // ── Versions List ──
-  const activeVersion = versions.find((v) => v.is_active);
-  const hasDraft = versions.some((v) => !v.is_active && !v.published_at);
+  // ── Versions View ──
+  if (view === 'versions' && selectedChecklist) {
+    const activeVersion = versions.find((v) => v.is_active);
+    const hasDraft = versions.some((v) => !v.is_active && !v.published_at);
 
+    return (
+      <div className="admin-checklists">
+        <div className="admin-page-header">
+          <div>
+            <button className="btn-back" onClick={handleBackToList}>← Back to Checklists</button>
+            <h2 style={{ marginTop: '0.5rem' }}>{selectedChecklist.name}</h2>
+          </div>
+        </div>
+
+        {error && <div className="error-message">{error}</div>}
+
+        <div className="admin-toolbar">
+          <button
+            className="btn-primary"
+            onClick={handleClone}
+            disabled={hasDraft || !activeVersion}
+          >
+            {hasDraft ? 'Draft exists' : 'Create New Draft'}
+          </button>
+        </div>
+
+        {versions.length === 0 ? (
+          <p className="empty-state">No versions found</p>
+        ) : (
+          <div className="version-list">
+            {versions.map((ver) => {
+              const isDraft = !ver.is_active && !ver.published_at;
+              const isActive = ver.is_active;
+              const status = isActive ? 'active' : isDraft ? 'draft' : 'previous';
+
+              return (
+                <div key={ver.id} className={`version-card version-card--${status}`}>
+                  <div className="version-card-header">
+                    <span className="version-number">Version {ver.version_number}</span>
+                    <span className={`version-badge version-badge--${status}`}>
+                      {status === 'active' ? 'Active' : status === 'draft' ? 'Draft' : 'Previous'}
+                    </span>
+                  </div>
+
+                  <div className="version-card-meta">
+                    {ver.published_at
+                      ? `Published ${new Date(ver.published_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                      : `Created ${new Date(ver.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                  </div>
+
+                  <div className="version-card-actions">
+                    {isDraft ? (
+                      <>
+                        <button
+                          className="btn-primary btn-small"
+                          onClick={() => loadVersionEditor(ver, false)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn-publish btn-small"
+                          onClick={() => handlePublish(ver)}
+                        >
+                          Publish
+                        </button>
+                        <button
+                          className="btn-danger btn-small"
+                          onClick={() => handleDeleteVersion(ver)}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="btn-secondary btn-small"
+                        onClick={() => loadVersionEditor(ver, true)}
+                      >
+                        View
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Checklist List View (default) ──
   return (
     <div className="admin-checklists">
       <div className="admin-page-header">
         <h2>Checklist Management</h2>
-        {checklist && <span className="admin-count">{checklist.name}</span>}
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setShowCreateForm(!showCreateForm);
+            setNewChecklistName('');
+            setError(null);
+          }}
+        >
+          {showCreateForm ? 'Cancel' : '+ New Checklist'}
+        </button>
       </div>
 
       {error && <div className="error-message">{error}</div>}
 
-      <div className="admin-toolbar">
-        <button
-          className="btn-primary"
-          onClick={handleClone}
-          disabled={hasDraft || !activeVersion}
-        >
-          {hasDraft ? 'Draft exists' : 'Create New Draft'}
-        </button>
-      </div>
+      {showCreateForm && (
+        <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
+          <h3>Create New Checklist</h3>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateChecklist();
+            }}
+            noValidate
+          >
+            <label htmlFor="checklist-name">Checklist Name *</label>
+            <input
+              id="checklist-name"
+              type="text"
+              value={newChecklistName}
+              onChange={(e) => setNewChecklistName(e.target.value)}
+              placeholder="e.g. HGV Daily Inspection"
+              required
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={createLoading || !newChecklistName.trim()}
+              style={{ width: '100%', marginTop: '0.75rem' }}
+            >
+              {createLoading ? 'Creating...' : 'Create Checklist'}
+            </button>
+          </form>
+        </div>
+      )}
 
-      {versions.length === 0 ? (
-        <p className="empty-state">No versions found</p>
+      {checklists.length === 0 ? (
+        <p className="empty-state">No checklists found — create one to get started</p>
       ) : (
-        <div className="version-list">
-          {versions.map((ver) => {
-            const isDraft = !ver.is_active && !ver.published_at;
-            const isActive = ver.is_active;
-            const status = isActive ? 'active' : isDraft ? 'draft' : 'previous';
+        <div className="checklist-list">
+          {checklists.map((cl) => (
+            <div
+              key={cl.id}
+              className={`checklist-card${cl.is_active ? ' checklist-card--active' : ''}`}
+            >
+              <div className="checklist-card-header">
+                <span className="checklist-card-name">{cl.name}</span>
+                {cl.is_active && (
+                  <span className="version-badge version-badge--active">Active</span>
+                )}
+              </div>
 
-            return (
-              <div key={ver.id} className={`version-card version-card--${status}`}>
-                <div className="version-card-header">
-                  <span className="version-number">Version {ver.version_number}</span>
-                  <span className={`version-badge version-badge--${status}`}>
-                    {status === 'active' ? 'Active' : status === 'draft' ? 'Draft' : 'Previous'}
-                  </span>
-                </div>
+              <div className="checklist-card-meta">
+                <span>{cl.version_count} version{cl.version_count !== 1 ? 's' : ''}</span>
+                <span>&middot;</span>
+                <span>Created {new Date(cl.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </div>
 
-                <div className="version-card-meta">
-                  {ver.published_at
-                    ? `Published ${new Date(ver.published_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                    : `Created ${new Date(ver.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`}
-                </div>
-
-                <div className="version-card-actions">
-                  {isDraft ? (
-                    <>
-                      <button
-                        className="btn-primary btn-small"
-                        onClick={() => loadVersionEditor(ver, false)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn-publish btn-small"
-                        onClick={() => handlePublish(ver)}
-                      >
-                        Publish
-                      </button>
-                      <button
-                        className="btn-danger btn-small"
-                        onClick={() => handleDeleteVersion(ver)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  ) : (
+              <div className="checklist-card-actions">
+                <button
+                  className="btn-primary btn-small"
+                  onClick={() => handleManageVersions(cl)}
+                >
+                  Manage Versions
+                </button>
+                {!cl.is_active && (
+                  <>
                     <button
                       className="btn-secondary btn-small"
-                      onClick={() => loadVersionEditor(ver, true)}
+                      onClick={() => handleActivate(cl)}
                     >
-                      View
+                      Activate
                     </button>
-                  )}
-                </div>
+                    <button
+                      className="btn-danger btn-small"
+                      onClick={() => handleDeleteChecklist(cl)}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>
