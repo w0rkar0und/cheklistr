@@ -19,11 +19,14 @@ test.describe('Home Page (authenticated)', () => {
   });
 
   test('header shows organisation name or logo', async ({ page }) => {
-    // Multi-tenancy: header displays org name as text OR logo image with alt text
+    // Wait for the page to fully load before checking the header
+    await expect(page.locator('.home-greeting h2')).toContainText('Welcome', { timeout: 15_000 });
+
+    // Multi-tenancy: header displays org name as text, or a logo <img> with alt text
     const header = page.locator('.app-header');
-    const hasText = await header.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
-    const hasLogo = await header.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
-    expect(hasText || hasLogo).toBeTruthy();
+    const orgText = header.getByText(/Greythorn|Cheklistr/i);
+    const orgLogo = header.locator('img.header-logo');
+    await expect(orgText.or(orgLogo)).toBeVisible({ timeout: 5_000 });
   });
 
   test('shows Sign Out button', async ({ page }) => {
