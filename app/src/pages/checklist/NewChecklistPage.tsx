@@ -11,6 +11,7 @@ import { ReviewStep } from '../../components/checklist/ReviewStep';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
 import { savePendingSubmission, getPendingCount, saveDraft, deleteDraft, getDraft } from '../../lib/offlineDb';
+import { getCurrentPosition, requestLocationPermission } from '../../lib/nativeGeolocation';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { ResponseValue } from '../../stores/checklistStore';
 import type { PendingPhoto, PendingDefect, PendingResponse, DraftResponse, DraftPhoto, DraftDefect } from '../../lib/offlineDb';
@@ -194,6 +195,11 @@ export function NewChecklistPage() {
     window.scrollTo(0, 0);
   }, [store]);
 
+  // Request location permission early so the native dialog appears before submission
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
   const handleSubmit = async () => {
     if (!store.version || !profile) return;
 
@@ -229,30 +235,22 @@ export function NewChecklistPage() {
       // ── Geolocation: capture GPS coordinates (mandatory) ──
       setSubmitProgress('Getting location…');
       console.log('[SUBMIT] Requesting geolocation…');
-      let geoLatitude: number | null = null;
-      let geoLongitude: number | null = null;
 
-      try {
-        const position = await withTimeout(
-          new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 15000,
-              maximumAge: 60000,
-            });
-          }),
-          20000,
-          'Geolocation'
-        );
-        geoLatitude = position.coords.latitude;
-        geoLongitude = position.coords.longitude;
-        console.log('[SUBMIT] Geolocation OK:', geoLatitude, geoLongitude);
-      } catch (geoErr) {
-        console.error('[SUBMIT] Geolocation failed:', geoErr);
+      const geoPos = await withTimeout(
+        getCurrentPosition(),
+        20000,
+        'Geolocation'
+      );
+
+      if (!geoPos) {
         throw new Error(
-          'Location access is required to submit the checklist. Please enable location services in your browser settings and try again.'
+          'Location access is required to submit the checklist. Please enable location services and try again.'
         );
       }
+
+      const geoLatitude = geoPos.latitude;
+      const geoLongitude = geoPos.longitude;
+      console.log('[SUBMIT] Geolocation OK:', geoLatitude, geoLongitude);
 
       // ── Step 1: Insert submission via raw fetch (bypasses Supabase JS client) ──
       setSubmitProgress('Step 1/5: Creating submission…');
@@ -562,19 +560,11 @@ export function NewChecklistPage() {
     let geoLatitude = 0;
     let geoLongitude = 0;
     try {
-      const position = await withTimeout(
-        new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 60000,
-          });
-        }),
-        20000,
-        'Geolocation'
-      );
-      geoLatitude = position.coords.latitude;
-      geoLongitude = position.coords.longitude;
+      const geoPos = await withTimeout(getCurrentPosition(), 20000, 'Geolocation');
+      if (geoPos) {
+        geoLatitude = geoPos.latitude;
+        geoLongitude = geoPos.longitude;
+      }
     } catch {
       // GPS optional for offline — can't block the save
       console.warn('[SUBMIT] GPS unavailable for offline save');

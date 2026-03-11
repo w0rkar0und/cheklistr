@@ -1,9 +1,25 @@
 import { isNative } from './capacitorPlatform';
 
-interface Position {
+export interface Position {
   latitude: number;
   longitude: number;
   accuracy: number;
+}
+
+/**
+ * Request location permission upfront (triggers the native permission dialog).
+ * On web, this is a no-op — the browser prompts on first getCurrentPosition call.
+ */
+export async function requestLocationPermission(): Promise<boolean> {
+  if (!isNative()) return true;
+
+  try {
+    const { Geolocation } = await import('@capacitor/geolocation');
+    const status = await Geolocation.requestPermissions();
+    return status.location === 'granted' || status.coarseLocation === 'granted';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -22,7 +38,7 @@ async function getNativePosition(): Promise<Position | null> {
   try {
     const pos = await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
-      timeout: 10_000,
+      timeout: 15_000,
     });
 
     return {
@@ -51,7 +67,7 @@ function getWebPosition(): Promise<Position | null> {
         });
       },
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 10_000 },
+      { enableHighAccuracy: true, timeout: 15_000 },
     );
   });
 }
