@@ -26,7 +26,7 @@ This is **not** a generic task manager. It is purpose-built for fleet inspection
 | Backend | Supabase (PostgreSQL + Auth + Storage) | JS client 2.98.0 |
 | Edge Functions | Deno (Supabase runtime) | — |
 | Offline Storage | idb (IndexedDB wrapper) | 8.0.3 |
-| Mobile/Native | Capacitor | 7.2.0 |
+| Mobile/Native | Capacitor | 8.2.0 |
 | Styling | Native CSS only — NO framework | — |
 | E2E Testing | Playwright (chromium + mobile-chrome) | — |
 | CI/CD | GitHub Actions (Node 20) | — |
@@ -47,7 +47,8 @@ This is **not** a generic task manager. It is purpose-built for fleet inspection
 | Stream | Location | Status |
 |--------|----------|--------|
 | Core build | `app/src/` | Active — see `app/CLAUDE.md` |
-| iOS / Capacitor | `app/ios/` | Active — see `app/ios/CLAUDE.md` |
+| Android / Capacitor | `app/android/` | Active — freshly set up |
+| iOS / Capacitor | `app/ios/` | Stale — needs regeneration from current main |
 | E2E Testing | `testing/` | Active — see `testing/CLAUDE.md` |
 | Multi-tenancy / Supabase | `supabase/` | Active — see `supabase/CLAUDE.md` |
 
@@ -94,6 +95,9 @@ cd testing && npx playwright test
 
 # Run specific E2E suite
 cd testing && npx playwright test e2e/<suite-name>.spec.ts
+
+# Android: build + sync + open in Android Studio
+cd app && npm run cap:build:android && npm run cap:android
 ```
 
 ---
@@ -164,11 +168,45 @@ Full schema detail: see `supabase/CLAUDE.md`.
 **Storage purge script updated** (`supabase/scripts/purge-storage.ts`):
 - Now also purges test org logos from `org-assets` bucket while preserving Greythorn's folder.
 
+### Session 3 — 11 March 2026: Brand Guidelines + Android
+
+**Brand guidelines applied** (from `/branding/Cheklistr_Brand_Guidelines_Full.pdf`):
+- Green-led colour palette: `--color-primary: #22C55E`, new `--color-nav: #0F172A` for sidebar/header dark shell.
+- Removed `--org-primary` cascade entirely — all 29 CSS refs replaced with `var(--color-primary)`, `brandStyle` removed from AdminLayout.tsx and AppLayout.tsx. The app always uses Cheklistr's green.
+- Version B wordmark logo on login page (`app/public/cheklistr-logo.png`), tagline "Never miss a step."
+- Version C icon as favicon, PWA icons, apple-touch-icon (from brand asset pack).
+- Cheklistr icon C mark in top-right of admin main area (64px) and site manager header (40px).
+- Active sidebar nav border uses green (`--color-primary`) instead of white.
+- Secondary button: neutral filled background with slate text per guidelines.
+- `font-feature-settings: "cv01", "tnum"` on body for Inter's alternative glyphs and tabular numbers.
+- Meta description updated to "Cheklistr — Never miss a step." (affects WhatsApp/social link previews).
+- Theme-color updated to `#0F172A` in index.html and PWA manifest.
+- Spacing grid documented (8px base, 4px half-step), added `--space-3xl: 4rem` (64px).
+- Hardcoded hover colours (`#15803D`) replaced with `var(--color-primary-light)` tokens.
+- Dead Vite scaffolding files deleted (`App.css`, `index.css`).
+
+**Admin dashboard fixes:**
+- Added Sign Out button to admin sidebar footer.
+- Super admin users hidden from regular admin's User Management view (`.neq('role', 'super_admin')` filter).
+
+**Capacitor Android setup** (fresh — `feature/capacitor-native` branch deleted):
+- Installed Capacitor 8.2.0 core + 6 plugins: camera, geolocation, preferences, network, splash-screen, biometric-auth.
+- Created `capacitor.config.ts` at project root (app ID: `com.cheklistr.app`).
+- Added Android platform (`app/android/`) with branded icons (all mipmap densities), dark slate status/nav bars, and XML splash screen (Cheklistr icon centred on `#0F172A`).
+- Created native abstraction modules in `app/src/lib/`: `capacitorPlatform.ts`, `nativeCamera.ts`, `nativeGeolocation.ts`, `secureStorage.ts`, `biometricAuth.ts`. All use `Capacitor.isNativePlatform()` gating with web fallbacks.
+- `NewChecklistPage.tsx` updated to use `nativeGeolocation.ts` module (was using `navigator.geolocation` directly). Location permission now requested on checklist page mount.
+- npm scripts added: `cap:sync`, `cap:android`, `cap:build:android`.
+
+**E2E test fixes** (all 8 suites green):
+- Login smoke test: check for `.login-logo` image and "Never miss a step" tagline.
+- Multi-tenancy tests: use class-specific locators (`.header-title`, `.header-logo`, `.cheklistr-mark`) instead of alt-text selectors that matched multiple images after Cheklistr mark was added.
+
 ### What's next
-- Multi-tenancy feature build is complete (Phases 1–4 done).
-- E2E workflow and purge automation are in place.
+- Test Android build on physical device (camera, GPS, biometrics, offline submission).
+- iOS Capacitor setup (same pattern as Android — `npx cap add ios`, reuse native abstraction layer).
+- Consider conditionally disabling PWA service worker on native if caching conflicts arise.
+- The stale `app/ios/` directory from the old branch is still on main — clean up or regenerate when starting iOS work.
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
-- Consider compressing logos on upload (like the photo pipeline does for vehicle photos) to reduce storage usage.
 
 ---
 
