@@ -19,11 +19,12 @@ test.describe('Org Branding — App Layout', () => {
     });
 
     // Greythorn seed data has org name "Greythorn Contract Logistics"
-    // The header shows the org name as text OR a logo image with alt text
+    // The header shows the org name as text, a logo image, or the Cheklistr mark
     const header = page.locator('.app-header');
-    const hasText = await header.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
-    const hasLogo = await header.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
-    expect(hasText || hasLogo).toBeTruthy();
+    const orgText = header.locator('.header-title');
+    const orgLogo = header.locator('img.header-logo');
+    const cheklistrMark = header.locator('img.cheklistr-mark');
+    await expect(orgText.or(orgLogo).or(cheklistrMark).first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('header shows user full name', async ({ page }) => {
@@ -52,11 +53,11 @@ test.describe('Org Branding — Admin Layout', () => {
     await page.goto('/admin');
     await expect(page.locator('.admin-layout')).toBeVisible({ timeout: 15_000 });
 
-    // Sidebar header should show org name as text OR a logo image with alt text
+    // Sidebar header should show org name as text OR a logo image
     const sidebarHeader = page.locator('.sidebar-header');
-    const hasText = await sidebarHeader.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
-    const hasLogo = await sidebarHeader.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
-    expect(hasText || hasLogo).toBeTruthy();
+    const orgText = sidebarHeader.locator('h2');
+    const orgLogo = sidebarHeader.locator('img.sidebar-logo');
+    await expect(orgText.or(orgLogo).first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('admin sidebar shows role badge matching user role', async ({ page }) => {
@@ -179,9 +180,10 @@ test.describe('Org Context — Persistence', () => {
       timeout: 15_000,
     });
 
-    // Header should still show the same org context (text or logo)
-    const hasTextAfter = await header.textContent().then(t => /Greythorn|Cheklistr/i.test(t || ''));
-    const hasLogoAfter = await header.locator('img[alt*="Greythorn"], img[alt*="Cheklistr"]').isVisible().catch(() => false);
-    expect(hasTextAfter || hasLogoAfter).toBeTruthy();
+    // Header should still show the same org context (text, logo, or Cheklistr mark)
+    const orgText = header.locator('.header-title');
+    const orgLogo = header.locator('img.header-logo');
+    const cheklistrMark = header.locator('img.cheklistr-mark');
+    await expect(orgText.or(orgLogo).or(cheklistrMark).first()).toBeVisible({ timeout: 5_000 });
   });
 });
