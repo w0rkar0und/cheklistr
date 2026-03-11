@@ -267,6 +267,7 @@ export function NewChecklistPage() {
         status: 'submitted',
         contractor_id: hrCode,
         contractor_name: store.driverInfo.name || null,
+        org_id: profile.org_id,
         vehicle_registration: store.vehicleInfo.vehicleRegistration,
         mileage: store.vehicleInfo.mileage ? parseInt(store.vehicleInfo.mileage, 10) : null,
         make_model: store.vehicleInfo.makeModel || null,
@@ -381,7 +382,7 @@ export function NewChecklistPage() {
       await Promise.all(
         validPhotos.map(async ({ photoType, compressed }) => {
           try {
-            const filePath = `${submissionId}/${photoType}.jpg`;
+            const filePath = `${profile.org_id}/${submissionId}/${photoType}.jpg`;
             const storageUrl = `${SUPABASE_URL}/storage/v1/object/vehicle-photos/${filePath}`;
 
             const uploadRes = await withTimeout(
@@ -405,9 +406,7 @@ export function NewChecklistPage() {
               return;
             }
 
-            // Build the public URL (same pattern Supabase uses)
-            const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/vehicle-photos/${filePath}`;
-
+            // Store the storage path (not a public URL) — buckets are private
             await withTimeout(
               fetch(`${SUPABASE_URL}/rest/v1/submission_photos`, {
                 method: 'POST',
@@ -420,7 +419,7 @@ export function NewChecklistPage() {
                 body: JSON.stringify({
                   submission_id: submissionId,
                   photo_type: photoType,
-                  storage_url: publicUrl,
+                  storage_url: filePath,
                 }),
               }),
               10000,
@@ -457,7 +456,7 @@ export function NewChecklistPage() {
               file = await blobUrlToFile(defect.imageUrl!, `defect_${i + 1}.jpg`);
             }
             const compressed = await compressImage(file);
-            const filePath = `${submissionId}/defect_${i + 1}.jpg`;
+            const filePath = `${profile.org_id}/${submissionId}/defect_${i + 1}.jpg`;
             const storageUrl = `${SUPABASE_URL}/storage/v1/object/defect-photos/${filePath}`;
 
             const upRes = await withTimeout(
@@ -475,7 +474,7 @@ export function NewChecklistPage() {
               `Defect photo ${i + 1}`
             );
             if (upRes.ok) {
-              defectImageUrl = `${SUPABASE_URL}/storage/v1/object/public/defect-photos/${filePath}`;
+              defectImageUrl = filePath;
             } else {
               const errBody = await upRes.text();
               console.error(`[SUBMIT] Defect photo FAILED (${i + 1}): ${upRes.status} ${errBody}`);

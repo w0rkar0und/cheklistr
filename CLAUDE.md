@@ -131,10 +131,9 @@ Full schema detail: see `supabase/CLAUDE.md`.
 ### What's fixed
 - Admin suite: 30/30 passing (was 0/30 — missing credentials)
 - Multi-tenancy suite: 24/24 passing, 1 skipped (was 7/23 — missing admin auth state)
-- Super-admin suite: 22/23 passing (was 0/23 — missing credentials). The 1 remaining failure (`empty name shows validation error`) will pass once the `noValidate` deploy hits production.
+- Super-admin suite: 23/23 passing (was 0/23 — missing credentials). `noValidate` fix confirmed in CI after deploy.
 
 ### What's next
-- Verify the super-admin validation test passes in CI after Vercel deploys the `noValidate` change.
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
 
 ---
