@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { supabase, SUPABASE_URL } from '../../lib/supabase';
 import type { Organisation } from '../../types/database';
 
 // ============================================================
@@ -34,6 +34,8 @@ export function AdminOrganisations() {
   const [form, setForm] = useState<OrgForm>({ ...emptyForm });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const loadOrganisations = async () => {
     setLoading(true);
@@ -195,6 +197,78 @@ export function AdminOrganisations() {
     }
   };
 
+  const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (!editingOrg || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+
+    if (!file.type.startsWith('image/')) {
+      setFormError('Please select an image file (JPEG, PNG, SVG, or WebP)');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setFormError('Logo must be under 2 MB');
+      return;
+    }
+
+    setLogoUploading(true);
+    setFormError(null);
+
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const storagePath = `${editingOrg.id}/logo.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('org-assets')
+        .upload(storagePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const logoUrl = `${SUPABASE_URL}/storage/v1/object/public/org-assets/${storagePath}`;
+      const { error: updateError } = await supabase
+        .from('organisations')
+        .update({ logo_url: logoUrl })
+        .eq('id', editingOrg.id);
+
+      if (updateError) throw updateError;
+
+      setEditingOrg({ ...editingOrg, logo_url: logoUrl });
+      await loadOrganisations();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to upload logo');
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    if (!editingOrg?.logo_url) return;
+    setLogoUploading(true);
+    setFormError(null);
+
+    try {
+      // Extract storage path from full URL
+      const pathMatch = editingOrg.logo_url.match(/org-assets\/(.+)$/);
+      if (pathMatch) {
+        await supabase.storage.from('org-assets').remove([pathMatch[1]]);
+      }
+
+      const { error } = await supabase
+        .from('organisations')
+        .update({ logo_url: null })
+        .eq('id', editingOrg.id);
+
+      if (error) throw error;
+
+      setEditingOrg({ ...editingOrg, logo_url: null });
+      await loadOrganisations();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to remove logo');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   return (
     <div className="admin-organisations">
       <div className="admin-page-header">
@@ -318,6 +392,37 @@ export function AdminOrganisations() {
               />
             </div>
 
+            <label>Organisation Logo</label>
+            {editingOrg.logo_url ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <img
+                  src={editingOrg.logo_url}
+                  alt="Current logo"
+                  style={{ width: '3rem', height: '3rem', objectFit: 'contain', borderRadius: '4px', border: '1px solid #ccc' }}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={handleLogoRemove}
+                  disabled={logoUploading}
+                >
+                  {logoUploading ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+            ) : (
+              <small style={{ color: '#666', display: 'block', marginBottom: '0.5rem' }}>
+                No logo set — upload one below
+              </small>
+            )}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/svg+xml,image/webp"
+              onChange={handleLogoUpload}
+              disabled={logoUploading}
+            />
+            {logoUploading && <small style={{ color: '#666' }}>Uploading...</small>}
+
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
               <button
                 type="submit"
@@ -354,6 +459,7 @@ export function AdminOrganisations() {
               <tr>
                 <th>Name</th>
                 <th>Slug</th>
+                <th>Logo</th>
                 <th>Users</th>
                 <th>Colour</th>
                 <th>Status</th>
@@ -365,6 +471,17 @@ export function AdminOrganisations() {
                 <tr key={org.id} className={!org.is_active ? 'row-inactive' : ''}>
                   <td style={{ fontWeight: 500 }}>{org.name}</td>
                   <td className="td-mono">{org.slug}</td>
+                  <td>
+                    {org.logo_url ? (
+                      <img
+                        src={org.logo_url}
+                        alt=""
+                        style={{ width: '2rem', height: '2rem', objectFit: 'contain', borderRadius: '3px' }}
+                      />
+                    ) : (
+                      <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>None</span>
+                    )}
+                  </td>
                   <td>{org.user_count}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

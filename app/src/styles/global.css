@@ -144,7 +144,7 @@ button:disabled {
 }
 
 .btn-primary {
-  background-color: var(--color-primary);
+  background-color: var(--org-primary, var(--color-primary));
   color: white;
 }
 
@@ -181,7 +181,7 @@ button:disabled {
 }
 
 .app-header {
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
   padding: var(--space-md) var(--space-lg);
   position: sticky;
@@ -226,7 +226,7 @@ button:disabled {
 
 .admin-sidebar {
   width: 240px;
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
   display: flex;
   flex-direction: column;
@@ -321,7 +321,7 @@ button:disabled {
 }
 
 .login-card h1 {
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   margin-bottom: var(--space-xs);
 }
 
@@ -440,7 +440,7 @@ button:disabled {
   width: 32px;
   height: 32px;
   border: 3px solid var(--color-border);
-  border-top-color: var(--color-primary);
+  border-top-color: var(--org-primary, var(--color-primary));
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -585,7 +585,7 @@ button:disabled {
 .driver-fields-title {
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   margin-bottom: var(--space-sm);
 }
 
@@ -616,7 +616,7 @@ button:disabled {
 
 .btn-lookup {
   padding: 0.5rem 1rem;
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -681,7 +681,7 @@ button:disabled {
 .checklist-section-title {
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-xs);
   border-bottom: 2px solid var(--color-primary-lighter);
@@ -831,7 +831,7 @@ button:disabled {
   font-weight: 600;
   min-height: 36px;
   border-radius: var(--radius-sm);
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
   border: none;
   cursor: pointer;
@@ -1032,7 +1032,7 @@ button:disabled {
   font-size: var(--font-size-base);
   font-weight: 600;
   margin-bottom: var(--space-sm);
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
 }
 
 .review-subsection {
@@ -1159,7 +1159,7 @@ button:disabled {
   border-top: 3px solid transparent;
 }
 
-.stat-card--primary { border-top-color: var(--color-primary); }
+.stat-card--primary { border-top-color: var(--org-primary, var(--color-primary)); }
 .stat-card--accent { border-top-color: var(--color-accent); }
 .stat-card--success { border-top-color: var(--color-success); }
 .stat-card--warning { border-top-color: var(--color-warning); }
@@ -1592,7 +1592,7 @@ button:disabled {
   left: 0;
   right: 0;
   z-index: 900;
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
   padding: var(--space-sm) var(--space-md);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
@@ -1684,8 +1684,8 @@ button:disabled {
 
 .btn-toggle {
   background: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
+  border: 1px solid var(--org-primary, var(--color-primary));
   padding: 8px 14px;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
@@ -1696,7 +1696,7 @@ button:disabled {
 }
 
 .btn-toggle:hover {
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
 }
 
@@ -1727,7 +1727,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  background: var(--color-primary);
+  background: var(--org-primary, var(--color-primary));
   color: white;
   padding: var(--space-xs) var(--space-md);
   border-radius: var(--radius-sm);
@@ -1763,7 +1763,7 @@ button:disabled {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--color-primary);
+  accent-color: var(--org-primary, var(--color-primary));
 }
 
 .row-selected {
@@ -1890,13 +1890,13 @@ button:disabled {
 
 .pending-header h2 {
   font-size: 1.25rem;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
 }
 
 .btn-back {
   background: none;
   border: none;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   font-size: 1rem;
   cursor: pointer;
   padding: var(--space-xs);
@@ -1989,7 +1989,7 @@ button:disabled {
 .draft-vrm {
   font-weight: 700;
   font-size: 1.05rem;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
 }
 
 .draft-card-details {
@@ -2028,7 +2028,7 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   margin-bottom: var(--space-xs);
 }
 
@@ -2115,7 +2115,7 @@ button:disabled {
 .version-number {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
 }
 
 .version-badge {
@@ -2191,7 +2191,7 @@ button:disabled {
 
 .editor-title h2 {
   font-size: 1.25rem;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   margin: 0;
 }
 
@@ -2249,13 +2249,13 @@ button:disabled {
 
 .section-name-display {
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   font-size: 0.95rem;
 }
 
 .section-name-input {
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
   font-size: 0.95rem;
   border: 1px solid transparent;
   background: transparent;
@@ -2302,7 +2302,7 @@ button:disabled {
 
 .reorder-btn:hover:not(:disabled) {
   background: var(--color-bg-secondary);
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
 }
 
 .reorder-btn:disabled {
@@ -2400,7 +2400,7 @@ button:disabled {
 
 .btn-add-item:hover {
   background: var(--color-bg-secondary);
-  color: var(--color-primary);
+  color: var(--org-primary, var(--color-primary));
 }
 
 /* ==========================================
