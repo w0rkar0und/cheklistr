@@ -92,7 +92,7 @@ export function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <img src="/cheklistr-logo.png" alt="Cheklistr" className="login-logo" />
-        <p className="login-subtitle">Vehicle Inspection System</p>
+        <p className="login-subtitle">Never miss a step.</p>
 
         <form onSubmit={handleSubmit} className="login-form">
           {error && (
