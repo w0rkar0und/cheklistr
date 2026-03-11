@@ -217,7 +217,7 @@ export function AdminOrganisations() {
       {showCreateForm && !editingOrg && (
         <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
           <h3>Create New Organisation</h3>
-          <form onSubmit={handleCreate}>
+          <form onSubmit={handleCreate} noValidate>
             {formError && <div className="error-message">{formError}</div>}
 
             <label htmlFor="org-name">Organisation Name *</label>
@@ -278,7 +278,7 @@ export function AdminOrganisations() {
       {editingOrg && (
         <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
           <h3>Edit Organisation: {editingOrg.name}</h3>
-          <form onSubmit={handleUpdate}>
+          <form onSubmit={handleUpdate} noValidate>
             {formError && <div className="error-message">{formError}</div>}
 
             <label htmlFor="edit-org-name">Organisation Name *</label>

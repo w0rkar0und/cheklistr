@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: authStatePath,
       },
       testIgnore: /(admin|super-admin|api-).*\.spec\.ts/,
-      dependencies: ['auth-setup'],
+      dependencies: ['auth-setup', 'admin-auth-setup'],
     },
 
     // Mobile viewport (uses Chromium engine, avoids needing WebKit install)
@@ -69,7 +69,7 @@ export default defineConfig({
         storageState: authStatePath,
       },
       testIgnore: /(admin|super-admin|api-).*\.spec\.ts/,
-      dependencies: ['auth-setup'],
+      dependencies: ['auth-setup', 'admin-auth-setup'],
     },
 
     // Admin tests — Desktop Chrome with admin session state

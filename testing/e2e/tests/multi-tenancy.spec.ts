@@ -73,7 +73,11 @@ test.describe('SignedImage — Admin Submission Detail', () => {
     storageState: adminAuthFile,
   });
 
-  test('submission detail loads photos via SignedImage', async ({ page }) => {
+  test('submission detail loads photos via SignedImage', async ({ page, viewport }) => {
+    // Skip on mobile viewports — sidebar overlays the table and intercepts clicks.
+    // SignedImage rendering is already covered by the desktop chromium project.
+    test.skip(!!viewport && viewport.width < 768, 'Skipped on mobile — sidebar overlay');
+
     await page.goto('/admin/submissions');
 
     // Wait for the submissions page to load
