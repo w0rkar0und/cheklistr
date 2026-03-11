@@ -38,7 +38,7 @@ This is **not** a generic task manager. It is purpose-built for fleet inspection
 
 - **Production:** cheklistr.app (Vercel) + Supabase project `trlrwnoapvcpszjbntso`
 - **Staging:** NONE — flow is `local dev → push to main → Vercel auto-deploys → production`
-- **E2E tests:** Run against live production URL via GitHub Actions (3-min Vercel deploy wait)
+- **E2E tests:** Run against live production URL via GitHub Actions (60s Vercel deploy wait)
 
 ---
 
@@ -143,9 +143,32 @@ Full schema detail: see `supabase/CLAUDE.md`.
 - Phase 3 complete: Checklist assignment UI — admins can list, create, activate, and delete checklists per org. Version management accessible from checklist list. E2E tests rewritten for new three-level flow (list → versions → editor).
 - **Migration 017** (Phase 4): Added `org_id` to `defects` and `submission_photos` tables. Backfilled from parent `submissions`. RLS policies rewritten to use direct `org_id` checks for admin queries. All insert paths updated.
 
+### Session 2 — 11 March 2026
+
+**E2E workflow improvements:**
+- Suite input changed from single-choice dropdown to free-text string supporting comma-separated names (e.g. `smoke,admin,api`). All 8 job `if` conditions use `contains()`.
+- Added `retries` input (0/1/2) for `workflow_dispatch`.
+
+**E2E data purge workflow** (`.github/workflows/purge-e2e-data.yml`):
+- One-click manual workflow to clean up test-created data. Requires typing "purge" to confirm.
+- Runs `supabase/scripts/purge-e2e-data.ts` (REST API + Auth Admin API — no psql, avoids IPv6 issue) then `purge-storage.ts`.
+- Preserves: Greythorn org, M.PATEL (super_admin), GREYADMIN01 (admin), TESTUSER01 (site_manager).
+- Safety check: aborts if any preserved users are not found before deleting.
+- GitHub secrets required: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD`.
+- **Lesson learned:** psql cannot reach Supabase direct DB from GitHub Actions (IPv6 only). Always use REST/Auth Admin APIs instead.
+- **Lesson learned:** Login IDs are stored uppercase in `public.users`. Purge script initially used wrong casing and deleted the m.patel super_admin — had to restore via Auth Admin API. Safety check now prevents this.
+
+**Org logo display constraints:**
+- Added `.header-logo` (max 2.5rem × 10rem) and `.sidebar-logo` (max 2rem × 8rem) CSS rules in `global.css`. Previously these classes had no styles, so large uploaded logos could overflow the layout.
+
+**Storage purge script updated** (`supabase/scripts/purge-storage.ts`):
+- Now also purges test org logos from `org-assets` bucket while preserving Greythorn's folder.
+
 ### What's next
 - Multi-tenancy feature build is complete (Phases 1–4 done).
+- E2E workflow and purge automation are in place.
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
+- Consider compressing logos on upload (like the photo pipeline does for vehicle photos) to reduce storage usage.
 
 ---
 
