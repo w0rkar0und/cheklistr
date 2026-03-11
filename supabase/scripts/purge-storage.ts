@@ -1,8 +1,11 @@
 /**
- * Purge all files from submission-related storage buckets.
+ * Purge files from storage buckets after E2E test cleanup.
  *
  * Supabase prevents direct SQL deletes on storage.objects, so this script
  * uses the Storage API to list and remove files from each bucket.
+ *
+ * - Submission buckets (vehicle-photos, defect-photos, checklist-photos): emptied entirely
+ * - org-assets bucket: only non-Greythorn org folders are deleted
  *
  * Usage:
  *   npx tsx supabase/scripts/purge-storage.ts
@@ -22,7 +25,8 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(1);
 }
 
-const BUCKETS = ['vehicle-photos', 'defect-photos', 'checklist-photos'];
+const GREYTHORN_ORG_ID = '00000000-0000-0000-0000-000000000001';
+const SUBMISSION_BUCKETS = ['vehicle-photos', 'defect-photos', 'checklist-photos'];
 
 const headers = {
   apikey: SERVICE_KEY,
@@ -124,17 +128,91 @@ async function emptyBucket(bucket: string): Promise<number> {
   return deleted;
 }
 
+/** Delete only non-Greythorn folders from org-assets bucket. */
+async function purgeTestOrgAssets(): Promise<number> {
+  const bucket = 'org-assets';
+  let deleted = 0;
+
+  const listRes = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/list/${bucket}`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ prefix: '', limit: 1000, offset: 0 }),
+    }
+  );
+
+  if (!listRes.ok) {
+    const err = await listRes.text();
+    console.error(`  ✗ Failed to list ${bucket}: ${listRes.status} ${err}`);
+    return 0;
+  }
+
+  const folders: { name: string }[] = await listRes.json();
+  const testFolders = folders.filter((f) => f.name !== GREYTHORN_ORG_ID);
+
+  if (testFolders.length === 0) {
+    console.log('  No test org assets to delete');
+    return 0;
+  }
+
+  // Collect files from each test org folder
+  const filePaths: string[] = [];
+  for (const folder of testFolders) {
+    const subRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/list/${bucket}`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prefix: folder.name, limit: 100, offset: 0 }),
+      }
+    );
+    if (subRes.ok) {
+      const subObjects: { name: string }[] = await subRes.json();
+      for (const sub of subObjects) {
+        filePaths.push(`${folder.name}/${sub.name}`);
+      }
+    }
+  }
+
+  if (filePaths.length > 0) {
+    const delRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${bucket}`,
+      {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ prefixes: filePaths }),
+      }
+    );
+    if (delRes.ok) {
+      const result = await delRes.json();
+      deleted = Array.isArray(result) ? result.length : filePaths.length;
+      console.log(`  Deleted ${deleted} files from ${testFolders.length} test org(s)`);
+    } else {
+      const err = await delRes.text();
+      console.error(`  ✗ Failed to delete from ${bucket}: ${delRes.status} ${err}`);
+    }
+  }
+
+  return deleted;
+}
+
 async function main() {
-  console.log('Purging submission storage buckets…\n');
+  console.log('Purging storage buckets…\n');
 
   let totalDeleted = 0;
 
-  for (const bucket of BUCKETS) {
+  for (const bucket of SUBMISSION_BUCKETS) {
     console.log(`Bucket: ${bucket}`);
     const count = await emptyBucket(bucket);
     totalDeleted += count;
     console.log(`  → ${count} files removed\n`);
   }
+
+  console.log('Bucket: org-assets (test orgs only)');
+  const orgCount = await purgeTestOrgAssets();
+  totalDeleted += orgCount;
+  console.log(`  → ${orgCount} files removed\n`);
 
   console.log(`Done. ${totalDeleted} total files removed.`);
 }
