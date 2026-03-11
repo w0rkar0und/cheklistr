@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -C 3 \"ALTER TABLE public.defects\\\\|ALTER TABLE public.submission_photos\" /c/Users/miten/Documents/GitHub/cheklistr/supabase/migrations/*.sql)",
+      "Bash(git log:*)",
+      "Bash(grep -r \"defect_photos\\\\|defect.photo\" /c/Users/miten/Documents/GitHub/cheklistr/supabase/migrations/*.sql | head -20)",
+      "Bash(grep -i \"TODO\\\\|FIXME\\\\|XXX\\\\|HACK\\\\|BUG\" /c/Users/miten/Documents/GitHub/cheklistr/supabase/migrations/*.sql)",
+      "Bash(grep -r \"defect_photo\\\\|defect.photo\" /c/Users/miten/Documents/GitHub/cheklistr/supabase/migrations/*.sql)",
+      "Bash(grep -r \"submission_photos\\\\|submission.photos\" /c/Users/miten/Documents/GitHub/cheklistr/supabase/migrations/012b* --count)",
+      "Bash(grep -l \"test.skip\\\\|test.only\\\\|test\\\\.todo\" /c/Users/miten/Documents/GitHub/cheklistr/testing/e2e/tests/*.spec.ts)",
+      "Bash(cd /c/Users/miten/Documents/GitHub/cheklistr/app && npm run build 2>&1 | tail -20)",
+      "Bash(npx tsc:*)",
+      "Bash(npx --no-install tsc -b 2>&1 | tail -20)",
+      "Bash(./node_modules/.bin/tsc -b 2>&1 | tail -20)",
+      "Bash(ls /c/Users/miten/Documents/GitHub/cheklistr/app/node_modules/.bin/tsc*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(grep -r \"primary_colour\\\\|logo_url\\\\|--org-primary\" ./app/src --include=\"*.tsx\" --include=\"*.ts\" --include=\"*.css\" 2>/dev/null | head -30)",
+      "Bash(grep -r \"primary_colour\\\\|logo_url\\\\|--org-primary\\\\|branding\" ./testing --include=\"*.spec.ts\" 2>/dev/null | head -20)",
+      "Bash(find /c/Users/miten/Documents/GitHub/cheklistr/testing -name \"*.spec.ts\" -o -name \"*.spec.tsx\" 2>/dev/null | head -20)",
+      "Bash(which supabase:*)",
+      "Bash(which npx:*)"
+    ]
+  }
+}
