@@ -28,20 +28,10 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: 'Test suite to run'
+        description: 'Suites to run: "all" or comma-separated (smoke,checklist,vrm,pdf,admin,api,multi-tenancy,super-admin)'
         required: true
         default: 'all'
-        type: choice
-        options:
-          - all
-          - smoke
-          - checklist
-          - vrm
-          - pdf
-          - admin
-          - api
-          - multi-tenancy
-          - super-admin
+        type: string
       skip_vercel_wait:
         description: 'Skip the 60-second Vercel build wait (use when deployment is already live)'
         required: false
@@ -131,8 +121,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'smoke'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'smoke')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -177,8 +167,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'checklist'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'checklist')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -223,8 +213,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'vrm'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'vrm')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -269,8 +259,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'pdf'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'pdf')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -315,8 +305,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'admin'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'admin')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -361,8 +351,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'api'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'api')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -407,8 +397,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'multi-tenancy'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'multi-tenancy')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -453,8 +443,8 @@ jobs:
     needs: setup
     if: >-
       github.event_name != 'workflow_dispatch'
-      || inputs.suite == 'all'
-      || inputs.suite == 'super-admin'
+      || contains(inputs.suite, 'all')
+      || contains(inputs.suite, 'super-admin')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
