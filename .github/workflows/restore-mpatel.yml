@@ -1,0 +1,28 @@
+name: Restore m.patel user
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restore:
+    name: Restore m.patel super_admin
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/scripts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install dotenv tsx
+
+      - name: Restore m.patel user
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx restore-mpatel.ts

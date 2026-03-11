@@ -3,7 +3,7 @@
 -- =============================================================================
 -- Removes all data created by E2E test runs while preserving:
 --   - Greythorn organisation (slug: greythorn)
---   - m.patel super admin user (login_id: M.PATEL)
+--   - M.PATEL super admin user
 --   - GREYADMIN01 admin user
 --   - TESTUSER01 site manager user
 --   - Greythorn's checklist templates

@@ -22,6 +22,7 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const GREYTHORN_ID = '00000000-0000-0000-0000-000000000001';
+// Login IDs are stored uppercase in the DB
 const PRESERVED_LOGINS = ['M.PATEL', 'GREYADMIN01', 'TESTUSER01'];
 
 const headers = {
@@ -124,14 +125,23 @@ async function main() {
   const sessCount = await restDelete('sessions', 'id=not.is.null');
   console.log(`Deleted ${sessCount} sessions`);
 
-  // 3. Get IDs of preserved users before deleting
+  // 3. Get IDs of preserved users before deleting — abort if any are missing
   const preservedRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/users?select=id&login_id=in.(${PRESERVED_LOGINS.join(',')})`,
+    `${SUPABASE_URL}/rest/v1/users?select=id,login_id&login_id=in.(${PRESERVED_LOGINS.join(',')})`,
     { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
   );
-  const preservedUsers: { id: string }[] = preservedRes.ok ? await preservedRes.json() : [];
+  const preservedUsers: { id: string; login_id: string }[] = preservedRes.ok ? await preservedRes.json() : [];
   const preservedIds = preservedUsers.map((u) => u.id);
-  console.log(`Preserving ${preservedIds.length} users: ${PRESERVED_LOGINS.join(', ')}`);
+  const foundLogins = preservedUsers.map((u) => u.login_id);
+  const missingLogins = PRESERVED_LOGINS.filter((l) => !foundLogins.includes(l));
+
+  console.log(`Found ${preservedIds.length}/${PRESERVED_LOGINS.length} preserved users: ${foundLogins.join(', ')}`);
+
+  if (missingLogins.length > 0) {
+    console.error(`ABORTING: Could not find preserved users: ${missingLogins.join(', ')}`);
+    console.error('Fix the PRESERVED_LOGINS list or restore missing users before running again.');
+    process.exit(1);
+  }
 
   // 4. Delete test users from public.users
   const userFilter = `login_id=not.in.(${PRESERVED_LOGINS.join(',')})`;
