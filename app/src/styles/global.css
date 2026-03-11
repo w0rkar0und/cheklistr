@@ -197,6 +197,12 @@ button:disabled {
   margin: 0 auto;
 }
 
+.header-logo {
+  max-height: 2.5rem;
+  max-width: 10rem;
+  object-fit: contain;
+}
+
 .header-title {
   font-size: var(--font-size-lg);
   font-weight: 700;
@@ -242,6 +248,12 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+}
+
+.sidebar-logo {
+  max-height: 2rem;
+  max-width: 8rem;
+  object-fit: contain;
 }
 
 .sidebar-header h2 {
