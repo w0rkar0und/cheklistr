@@ -18,9 +18,12 @@ export function AppLayout() {
           ) : (
             <h1 className="header-title">{organisation?.name ?? 'Cheklistr'}</h1>
           )}
-          {profile && (
-            <span className="header-user">{profile.full_name}</span>
-          )}
+          <div className="header-right">
+            {profile && (
+              <span className="header-user">{profile.full_name}</span>
+            )}
+            <img src="/cheklistr-icon.png" alt="Cheklistr" className="cheklistr-mark header-mark" />
+          </div>
         </div>
       </header>
       <main className="app-main">

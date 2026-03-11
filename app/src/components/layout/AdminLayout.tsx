@@ -55,6 +55,9 @@ export function AdminLayout() {
         )}
       </aside>
       <main className="admin-main">
+        <div className="admin-topbar">
+          <img src="/cheklistr-icon.png" alt="Cheklistr" className="cheklistr-mark" />
+        </div>
         <Outlet />
       </main>
     </div>
