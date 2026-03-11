@@ -127,13 +127,17 @@ Full schema detail: see `supabase/CLAUDE.md`.
 - **Playwright config** (`playwright.config.ts`): `chromium` and `mobile-chrome` projects now depend on `admin-auth-setup` so `admin.json` auth state exists for multi-tenancy tests that use `test.use({ storageState: adminAuthFile })`.
 - **AdminOrganisations.tsx**: Added `noValidate` to create and edit `<form>` elements so JS validation renders `.error-message` divs instead of browser-native tooltips.
 - **multi-tenancy.spec.ts**: SignedImage detail test skips on mobile viewport (sidebar overlays table rows).
+- **NewChecklistPage.tsx** (Phase 1 fix): Direct submit path now matches offline sync path — `org_id` in submission row, org-prefixed storage paths, storage paths stored instead of public URLs.
 
 ### What's fixed
 - Admin suite: 30/30 passing (was 0/30 — missing credentials)
 - Multi-tenancy suite: 24/24 passing, 1 skipped (was 7/23 — missing admin auth state)
 - Super-admin suite: 23/23 passing (was 0/23 — missing credentials). `noValidate` fix confirmed in CI after deploy.
+- Direct (online) submission path: org_id, photo storage paths, and defect image URLs now org-scoped (was broken for any non-legacy org).
 
 ### What's next
+- Phase 2: Dynamic org branding — wire `organisations.primary_colour` into CSS, build logo upload UI.
+- Phase 3: Checklist assignment UI per org.
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
 
 ---
