@@ -12,8 +12,8 @@ test.describe('Login Page — Form Elements', () => {
   });
 
   test('displays the login form with all three fields', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('Cheklistr');
-    await expect(page.locator('.login-subtitle')).toContainText('Vehicle Inspection System');
+    await expect(page.locator('.login-logo')).toBeVisible();
+    await expect(page.locator('.login-subtitle')).toContainText('Never miss a step');
     await expect(page.locator('#org-slug')).toBeVisible();
     await expect(page.locator('#login-id')).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();

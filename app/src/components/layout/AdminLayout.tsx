@@ -1,10 +1,19 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { LayoutDashboard, FileText, ClipboardCheck, Users, Clock, Building2, User } from 'lucide-react';
+import { signOut } from '../../lib/auth';
+import { LayoutDashboard, FileText, ClipboardCheck, Users, Clock, Building2, User, LogOut } from 'lucide-react';
 
 export function AdminLayout() {
   const profile = useAuthStore((s) => s.profile);
   const organisation = useAuthStore((s) => s.organisation);
+  const appSession = useAuthStore((s) => s.appSession);
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut(appSession?.id);
+    useAuthStore.getState().reset();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="admin-layout">
@@ -35,8 +44,13 @@ export function AdminLayout() {
         </nav>
         {profile && (
           <div className="sidebar-footer">
-            <User size={16} />
-            <span>{profile.full_name}</span>
+            <div className="sidebar-footer-user">
+              <User size={16} />
+              <span>{profile.full_name}</span>
+            </div>
+            <button className="btn-signout" onClick={handleSignOut}>
+              <LogOut size={16} /> Sign Out
+            </button>
           </div>
         )}
       </aside>

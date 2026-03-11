@@ -80,6 +80,11 @@ export function AdminUsers() {
       query = query.eq('org_id', filterOrgId);
     }
 
+    // Hide super_admin users from regular admin view
+    if (!isSuperAdmin) {
+      query = query.neq('role', 'super_admin');
+    }
+
     const { data, error } = await query;
 
     if (!error && data) {
