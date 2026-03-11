@@ -112,7 +112,7 @@ cd testing && npx playwright test e2e/<suite-name>.spec.ts
 
 `organisations` · `users` · `sessions` · `checklists` · `checklist_versions` · `checklist_sections` · `checklist_items` · `submissions` · `submission_answers` · `submission_photos` · `defects` · `defect_photos`
 
-17 migrations (001–016, with 012 split into 012a/012b).
+18 migrations (001–017, with 012 split into 012a/012b).
 Greythorn seeded as first org: slug `greythorn`, UUID `00000000-0000-0000-0000-000000000001`.
 
 Full schema detail: see `supabase/CLAUDE.md`.
@@ -141,9 +141,10 @@ Full schema detail: see `supabase/CLAUDE.md`.
 - Direct (online) submission path: org_id, photo storage paths, and defect image URLs now org-scoped (was broken for any non-legacy org).
 - Phase 2 complete: Dynamic org branding (CSS custom property cascade) and logo upload UI. All E2E suites green.
 - Phase 3 complete: Checklist assignment UI — admins can list, create, activate, and delete checklists per org. Version management accessible from checklist list. E2E tests rewritten for new three-level flow (list → versions → editor).
+- **Migration 017** (Phase 4): Added `org_id` to `defects` and `submission_photos` tables. Backfilled from parent `submissions`. RLS policies rewritten to use direct `org_id` checks for admin queries. All insert paths updated.
 
 ### What's next
-- Phase 4 (optional): Add `org_id` directly to `defects` and `submission_photos` tables for query performance.
+- Multi-tenancy feature build is complete (Phases 1–4 done).
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
 
 ---

@@ -159,6 +159,7 @@ export async function syncSubmission(
               headers,
               body: JSON.stringify({
                 submission_id: pending.submissionId,
+                org_id: pending.orgId,
                 photo_type: photoType,
                 storage_url: filePath,
               }),
@@ -218,6 +219,7 @@ export async function syncSubmission(
             headers,
             body: JSON.stringify({
               submission_id: pending.submissionId,
+              org_id: pending.orgId,
               defect_number: defect.defectNumber,
               image_url: defectStoragePath,
               details: defect.details,

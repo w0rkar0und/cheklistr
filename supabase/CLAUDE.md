@@ -48,6 +48,7 @@ Multi-tenancy was **retrofitted** onto a single-tenant build. The implementation
 | 014 | Org-scoped storage paths |
 | 015 | Super admin role + `/admin/organisations` |
 | 016 | Migrate auth.users synthetic emails |
+| 017 | Add `org_id` to `defects` and `submission_photos`, rewrite RLS |
 
 **Never edit existing migrations.** Always add a new numbered migration file.
 

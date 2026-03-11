@@ -127,6 +127,7 @@ export interface Submission {
 export interface SubmissionPhoto {
   id: string;
   submission_id: string;
+  org_id: string;
   photo_type: PhotoType;
   storage_url: string;
   created_at: string;
@@ -146,6 +147,7 @@ export interface ChecklistResponse {
 export interface Defect {
   id: string;
   submission_id: string;
+  org_id: string;
   defect_number: number;
   image_url: string | null;
   details: string | null;

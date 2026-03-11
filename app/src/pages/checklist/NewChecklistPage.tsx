@@ -418,6 +418,7 @@ export function NewChecklistPage() {
                 },
                 body: JSON.stringify({
                   submission_id: submissionId,
+                  org_id: profile.org_id,
                   photo_type: photoType,
                   storage_url: filePath,
                 }),
@@ -496,6 +497,7 @@ export function NewChecklistPage() {
               },
               body: JSON.stringify({
                 submission_id: submissionId,
+                org_id: profile.org_id,
                 defect_number: i + 1,
                 image_url: defectImageUrl,
                 details: defect.details,
