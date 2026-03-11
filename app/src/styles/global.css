@@ -16,24 +16,26 @@
 }
 
 :root {
-  /* Brand colours */
-  --color-primary: #1B3A5C;
-  --color-primary-light: #2E5A88;
-  --color-primary-lighter: #4A7FB5;
-  --color-accent: #0EA5E9;
+  /* Brand colours — Cheklistr green-led palette */
+  --color-primary: #22C55E;
+  --color-primary-light: #16A34A;
+  --color-primary-lighter: #4ADE80;
+  --color-primary-deep: #166534;
+  --color-accent: #3B82F6;
+  --color-nav: #0F172A;
 
   /* Status colours */
-  --color-success: #16A34A;
-  --color-warning: #D97706;
-  --color-danger: #DC2626;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
 
   /* Neutrals */
-  --color-bg: #F8FAFC;
-  --color-bg-subtle: #F1F5F9;
+  --color-bg: #F1F5F9;
+  --color-bg-subtle: #E2E8F0;
   --color-surface: #FFFFFF;
   --color-border: #E2E8F0;
   --color-border-light: #F1F5F9;
-  --color-text: #1E293B;
+  --color-text: #0F172A;
   --color-text-secondary: #64748B;
   --color-text-muted: #94A3B8;
 
@@ -175,7 +177,7 @@ button:active:not(:disabled) {
 }
 
 .btn-primary {
-  background-color: var(--org-primary, var(--color-primary));
+  background-color: var(--color-primary);
   color: white;
   box-shadow: var(--shadow-xs);
 }
@@ -216,7 +218,7 @@ button:active:not(:disabled) {
 }
 
 .app-header {
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-nav);
   color: white;
   padding: var(--space-md) var(--space-lg);
   position: sticky;
@@ -268,7 +270,7 @@ button:active:not(:disabled) {
 
 .admin-sidebar {
   width: 240px;
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-nav);
   color: white;
   display: flex;
   flex-direction: column;
@@ -364,7 +366,7 @@ button:active:not(:disabled) {
   align-items: center;
   justify-content: center;
   padding: var(--space-lg);
-  background: linear-gradient(135deg, #1B3A5C 0%, #2E5A88 50%, #1B3A5C 100%);
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
 }
 
 .login-card {
@@ -378,10 +380,17 @@ button:active:not(:disabled) {
 }
 
 .login-card h1 {
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-text);
   margin-bottom: var(--space-xs);
   font-size: var(--font-size-3xl);
   letter-spacing: -0.03em;
+}
+
+.login-logo {
+  display: block;
+  max-width: 220px;
+  height: auto;
+  margin: 0 auto var(--space-xs);
 }
 
 .login-subtitle {
@@ -516,7 +525,7 @@ button:active:not(:disabled) {
   width: 32px;
   height: 32px;
   border: 3px solid var(--color-border);
-  border-top-color: var(--org-primary, var(--color-primary));
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -667,7 +676,7 @@ button:active:not(:disabled) {
 .driver-fields-title {
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   margin-bottom: var(--space-sm);
 }
 
@@ -698,7 +707,7 @@ button:active:not(:disabled) {
 
 .btn-lookup {
   padding: 0.5rem 1rem;
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -764,7 +773,7 @@ button:active:not(:disabled) {
 .checklist-section-title {
   font-size: var(--font-size-base);
   font-weight: 600;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   margin-bottom: var(--space-md);
   padding-bottom: var(--space-xs);
   border-bottom: 2px solid var(--color-primary-lighter);
@@ -914,7 +923,7 @@ button:active:not(:disabled) {
   font-weight: 600;
   min-height: 36px;
   border-radius: var(--radius-sm);
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-primary);
   color: white;
   border: none;
   cursor: pointer;
@@ -1117,7 +1126,7 @@ button:active:not(:disabled) {
   font-size: var(--font-size-base);
   font-weight: 600;
   margin-bottom: var(--space-sm);
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 .review-subsection {
@@ -1252,7 +1261,7 @@ button:active:not(:disabled) {
   transform: translateY(-1px);
 }
 
-.stat-card--primary { border-top-color: var(--org-primary, var(--color-primary)); }
+.stat-card--primary { border-top-color: var(--color-primary); }
 .stat-card--accent { border-top-color: var(--color-accent); }
 .stat-card--success { border-top-color: var(--color-success); }
 .stat-card--warning { border-top-color: var(--color-warning); }
@@ -1262,7 +1271,7 @@ button:active:not(:disabled) {
   margin-bottom: var(--space-xs);
 }
 
-.stat-card--primary .stat-card-icon { color: var(--org-primary, var(--color-primary)); }
+.stat-card--primary .stat-card-icon { color: var(--color-primary); }
 .stat-card--accent .stat-card-icon { color: var(--color-accent); }
 .stat-card--success .stat-card-icon { color: var(--color-success); }
 .stat-card--warning .stat-card-icon { color: var(--color-warning); }
@@ -1712,7 +1721,7 @@ button:active:not(:disabled) {
   left: 0;
   right: 0;
   z-index: 900;
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-nav);
   color: white;
   padding: var(--space-sm) var(--space-md);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
@@ -1806,8 +1815,8 @@ button:active:not(:disabled) {
 
 .btn-toggle {
   background: transparent;
-  color: var(--org-primary, var(--color-primary));
-  border: 1px solid var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
   padding: 8px 14px;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
@@ -1818,7 +1827,7 @@ button:active:not(:disabled) {
 }
 
 .btn-toggle:hover {
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-primary);
   color: white;
 }
 
@@ -1849,7 +1858,7 @@ button:active:not(:disabled) {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  background: var(--org-primary, var(--color-primary));
+  background: var(--color-nav);
   color: white;
   padding: var(--space-xs) var(--space-md);
   border-radius: var(--radius-sm);
@@ -1885,7 +1894,7 @@ button:active:not(:disabled) {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--org-primary, var(--color-primary));
+  accent-color: var(--color-primary);
 }
 
 .row-selected {
@@ -2015,13 +2024,13 @@ button:active:not(:disabled) {
 
 .pending-header h2 {
   font-size: 1.25rem;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 .btn-back {
   background: none;
   border: none;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   font-size: 1rem;
   cursor: pointer;
   padding: var(--space-xs);
@@ -2120,7 +2129,7 @@ button:active:not(:disabled) {
 .draft-vrm {
   font-weight: 700;
   font-size: 1.05rem;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 .draft-card-details {
@@ -2159,7 +2168,7 @@ button:active:not(:disabled) {
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   margin-bottom: var(--space-xs);
 }
 
@@ -2248,7 +2257,7 @@ button:active:not(:disabled) {
 .checklist-card-name {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 .checklist-card-meta {
@@ -2298,7 +2307,7 @@ button:active:not(:disabled) {
 .version-number {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 .version-badge {
@@ -2374,7 +2383,7 @@ button:active:not(:disabled) {
 
 .editor-title h2 {
   font-size: 1.25rem;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   margin: 0;
 }
 
@@ -2433,13 +2442,13 @@ button:active:not(:disabled) {
 
 .section-name-display {
   font-weight: 600;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   font-size: 0.95rem;
 }
 
 .section-name-input {
   font-weight: 600;
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
   font-size: 0.95rem;
   border: 1px solid transparent;
   background: transparent;
@@ -2486,7 +2495,7 @@ button:active:not(:disabled) {
 
 .reorder-btn:hover:not(:disabled) {
   background: var(--color-bg-secondary);
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 .reorder-btn:disabled {
@@ -2584,7 +2593,7 @@ button:active:not(:disabled) {
 
 .btn-add-item:hover {
   background: var(--color-bg-secondary);
-  color: var(--org-primary, var(--color-primary));
+  color: var(--color-primary);
 }
 
 /* ==========================================

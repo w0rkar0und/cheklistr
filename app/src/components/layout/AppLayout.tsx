@@ -5,13 +5,8 @@ export function AppLayout() {
   const profile = useAuthStore((s) => s.profile);
   const organisation = useAuthStore((s) => s.organisation);
 
-  // Apply org branding via CSS custom property
-  const brandStyle = organisation?.primary_colour
-    ? { '--org-primary': organisation.primary_colour } as React.CSSProperties
-    : undefined;
-
   return (
-    <div className="app-layout" style={brandStyle}>
+    <div className="app-layout">
       <header className="app-header">
         <div className="header-content">
           {organisation?.logo_url ? (

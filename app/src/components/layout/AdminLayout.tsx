@@ -6,13 +6,8 @@ export function AdminLayout() {
   const profile = useAuthStore((s) => s.profile);
   const organisation = useAuthStore((s) => s.organisation);
 
-  // Apply org branding via CSS custom property
-  const brandStyle = organisation?.primary_colour
-    ? { '--org-primary': organisation.primary_colour } as React.CSSProperties
-    : undefined;
-
   return (
-    <div className="admin-layout" style={brandStyle}>
+    <div className="admin-layout">
       <aside className="admin-sidebar">
         <div className="sidebar-header">
           {organisation?.logo_url ? (
