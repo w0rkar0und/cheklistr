@@ -158,6 +158,10 @@ button {
   border-radius: var(--radius-md);
   padding: 0.75rem 1.5rem;
   min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   transition: background-color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -309,7 +313,9 @@ button:active:not(:disabled) {
 }
 
 .sidebar-nav a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
   padding: 0.625rem var(--space-lg);
   color: rgba(255, 255, 255, 0.65);
   text-decoration: none;
@@ -337,6 +343,9 @@ button:active:not(:disabled) {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: var(--font-size-sm);
   opacity: 0.7;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .admin-main {
@@ -385,6 +394,12 @@ button:active:not(:disabled) {
   text-align: left;
 }
 
+.login-field label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 .login-form button {
   width: 100%;
   margin-top: var(--space-md);
@@ -420,6 +435,9 @@ button:active:not(:disabled) {
 .home-section h3 {
   font-size: var(--font-size-base);
   margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
 }
 
 .empty-state {
@@ -505,6 +523,10 @@ button:active:not(:disabled) {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.icon-spin {
+  animation: spin 1s linear infinite;
 }
 
 .error-screen {
@@ -1234,6 +1256,16 @@ button:active:not(:disabled) {
 .stat-card--accent { border-top-color: var(--color-accent); }
 .stat-card--success { border-top-color: var(--color-success); }
 .stat-card--warning { border-top-color: var(--color-warning); }
+
+.stat-card-icon {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.stat-card--primary .stat-card-icon { color: var(--org-primary, var(--color-primary)); }
+.stat-card--accent .stat-card-icon { color: var(--color-accent); }
+.stat-card--success .stat-card-icon { color: var(--color-success); }
+.stat-card--warning .stat-card-icon { color: var(--color-warning); }
 
 .stat-card-value {
   font-size: var(--font-size-3xl);
@@ -1995,6 +2027,9 @@ button:active:not(:disabled) {
   padding: var(--space-xs);
   font-family: inherit;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .pending-list {

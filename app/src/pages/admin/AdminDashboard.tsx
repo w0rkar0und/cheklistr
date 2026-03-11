@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { ClipboardList, CalendarCheck, Users, AlertTriangle, type LucideIcon } from 'lucide-react';
 
 interface DashboardStats {
   totalSubmissions: number;
@@ -64,21 +65,25 @@ export function AdminDashboard() {
               label="Total Inspections"
               value={stats.totalSubmissions}
               colour="primary"
+              icon={ClipboardList}
             />
             <StatCard
               label="Today"
               value={stats.submissionsToday}
               colour="accent"
+              icon={CalendarCheck}
             />
             <StatCard
               label="Active Users"
               value={stats.activeUsers}
               colour="success"
+              icon={Users}
             />
             <StatCard
               label="Total Defects"
               value={stats.totalDefects}
               colour="warning"
+              icon={AlertTriangle}
             />
           </div>
 
@@ -99,13 +104,18 @@ function StatCard({
   label,
   value,
   colour,
+  icon: Icon,
 }: {
   label: string;
   value: number;
   colour: 'primary' | 'accent' | 'success' | 'warning';
+  icon: LucideIcon;
 }) {
   return (
     <div className={`stat-card stat-card--${colour}`}>
+      <div className="stat-card-icon">
+        <Icon size={22} />
+      </div>
       <div className="stat-card-value">{value}</div>
       <div className="stat-card-label">{label}</div>
     </div>

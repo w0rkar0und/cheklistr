@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { getPendingCount, getDraft, deleteDraft } from '../../lib/offlineDb';
 import type { DraftFormState } from '../../lib/offlineDb';
 import type { Submission } from '../../types/database';
+import { ClipboardPlus, LogOut, Play, Trash2, ChevronRight, FileCheck } from 'lucide-react';
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile);
@@ -152,10 +153,10 @@ export function HomePage() {
           </div>
           <div className="draft-card-actions">
             <button className="btn-primary btn-small" onClick={handleResumeDraft}>
-              Resume
+              <Play size={14} /> Resume
             </button>
             <button className="btn-danger btn-small" onClick={handleDiscardDraft}>
-              Discard
+              <Trash2 size={14} /> Discard
             </button>
           </div>
         </div>
@@ -170,7 +171,7 @@ export function HomePage() {
           <span className="pending-badge-text">
             submission{pendingCount !== 1 ? 's' : ''} pending sync
           </span>
-          <span className="pending-badge-arrow">→</span>
+          <ChevronRight size={20} className="pending-badge-arrow" />
         </button>
       )}
 
@@ -178,12 +179,12 @@ export function HomePage() {
         className="btn-primary btn-large"
         onClick={handleNewChecklist}
       >
-        New Vehicle Inspection
+        <ClipboardPlus size={20} /> New Vehicle Inspection
       </button>
 
       {/* Recent submissions */}
       <section className="home-section">
-        <h3>Recent Submissions</h3>
+        <h3><FileCheck size={18} /> Recent Submissions</h3>
         {loadingSubs ? (
           <p className="empty-state">Loading…</p>
         ) : recentSubmissions.length === 0 ? (
@@ -231,7 +232,7 @@ export function HomePage() {
         onClick={handleSignOut}
         style={{ width: '100%' }}
       >
-        Sign Out
+        <LogOut size={18} /> Sign Out
       </button>
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signIn, createAppSession, fetchUserProfile, lookupOrganisation } from '../../lib/auth';
 import { useAuthStore } from '../../stores/authStore';
+import { Building2, User, Lock, LogIn, Loader2 } from 'lucide-react';
 
 export function LoginPage() {
   const [orgSlug, setOrgSlug] = useState('');
@@ -98,50 +99,56 @@ export function LoginPage() {
             <div className="error-message">{error}</div>
           )}
 
-          <label htmlFor="org-slug">Organisation ID</label>
-          <input
-            id="org-slug"
-            type="text"
-            value={orgSlug}
-            onChange={(e) => setOrgSlug(e.target.value.toLowerCase().trim())}
-            placeholder="e.g. greythorn"
-            required
-            autoComplete="organization"
-            autoCapitalize="none"
-            disabled={loading}
-          />
+          <div className="login-field">
+            <label htmlFor="org-slug"><Building2 size={14} /> Organisation ID</label>
+            <input
+              id="org-slug"
+              type="text"
+              value={orgSlug}
+              onChange={(e) => setOrgSlug(e.target.value.toLowerCase().trim())}
+              placeholder="e.g. greythorn"
+              required
+              autoComplete="organization"
+              autoCapitalize="none"
+              disabled={loading}
+            />
+          </div>
 
-          <label htmlFor="login-id">User ID</label>
-          <input
-            id="login-id"
-            type="text"
-            value={loginId}
-            onChange={(e) => setLoginId(e.target.value.toUpperCase())}
-            placeholder="e.g. X123456"
-            required
-            autoComplete="username"
-            autoCapitalize="characters"
-            disabled={loading}
-          />
+          <div className="login-field">
+            <label htmlFor="login-id"><User size={14} /> User ID</label>
+            <input
+              id="login-id"
+              type="text"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value.toUpperCase())}
+              placeholder="e.g. X123456"
+              required
+              autoComplete="username"
+              autoCapitalize="characters"
+              disabled={loading}
+            />
+          </div>
 
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            required
-            autoComplete="current-password"
-            disabled={loading}
-          />
+          <div className="login-field">
+            <label htmlFor="password"><Lock size={14} /> Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              required
+              autoComplete="current-password"
+              disabled={loading}
+            />
+          </div>
 
           <button
             type="submit"
             className="btn-primary btn-large"
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? <><Loader2 size={20} className="icon-spin" /> Signing in...</> : <><LogIn size={20} /> Sign In</>}
           </button>
         </form>
       </div>

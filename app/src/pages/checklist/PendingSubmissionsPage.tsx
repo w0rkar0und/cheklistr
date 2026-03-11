@@ -6,6 +6,7 @@ import { getAccessTokenFromStorage } from '../../lib/supabase';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { PendingSubmission } from '../../lib/offlineDb';
 import type { SyncProgress } from '../../lib/syncSubmission';
+import { ArrowLeft, CloudUpload, Trash2 } from 'lucide-react';
 
 export function PendingSubmissionsPage() {
   const navigate = useNavigate();
@@ -143,7 +144,7 @@ export function PendingSubmissionsPage() {
     <div className="pending-page">
       <div className="pending-header">
         <button className="btn-back" onClick={() => navigate('/')}>
-          ← Back
+          <ArrowLeft size={18} /> Back
         </button>
         <h2>Pending Submissions</h2>
       </div>
@@ -222,14 +223,14 @@ export function PendingSubmissionsPage() {
                     onClick={() => handleSyncOne(sub)}
                     disabled={syncing || !isOnline}
                   >
-                    Sync
+                    <CloudUpload size={14} /> Sync
                   </button>
                   <button
                     className="btn-danger btn-small"
                     onClick={() => handleDelete(sub)}
                     disabled={syncing}
                   >
-                    Delete
+                    <Trash2 size={14} /> Delete
                   </button>
                 </div>
               </div>
