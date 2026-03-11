@@ -9,7 +9,7 @@
 
 ## Important: Tests Run Against Production
 
-E2E tests run against the **live deployed site** after Vercel deploys from `main`. The CI workflow waits 3 minutes post-push for Vercel to complete deployment before running tests. Do not remove this wait.
+E2E tests run against the **live deployed site** after Vercel deploys from `main`. The CI workflow waits 60 seconds post-push for Vercel to complete deployment before running tests. Do not remove this wait.
 
 ---
 

@@ -43,7 +43,7 @@ on:
           - multi-tenancy
           - super-admin
       skip_vercel_wait:
-        description: 'Skip the 3-minute Vercel build wait (use when deployment is already live)'
+        description: 'Skip the 60-second Vercel build wait (use when deployment is already live)'
         required: false
         default: false
         type: boolean
@@ -98,8 +98,8 @@ jobs:
           (github.event_name == 'push' || github.event_name == 'pull_request')
           || (github.event_name == 'workflow_dispatch' && inputs.skip_vercel_wait != true)
         run: |
-          echo "Waiting 3 minutes for Vercel deployment to complete…"
-          sleep 180
+          echo "Waiting 60 seconds for Vercel deployment to complete…"
+          sleep 60
 
       - name: Create .env file
         run: |
