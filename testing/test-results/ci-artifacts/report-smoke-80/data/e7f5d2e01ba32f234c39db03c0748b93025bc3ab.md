@@ -1,0 +1,83 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img "Greythorn Contract Logistics" [ref=e6]
+      - generic [ref=e7]: test user
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Welcome, test user" [level=2] [ref=e11]
+        - paragraph [ref=e12]: X000001 · DBH3
+      - button "New Vehicle Inspection" [ref=e13] [cursor=pointer]
+      - generic [ref=e14]:
+        - heading "Recent Submissions" [level=3] [ref=e15]
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - generic [ref=e18]:
+              - generic [ref=e19]: APIMMM6TTU6
+              - generic [ref=e20]: submitted
+            - generic [ref=e21]:
+              - text: API Test Driver
+              - generic [ref=e22]: (X999999)
+            - generic [ref=e23]: 11 Mar 2026, 15:22
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - generic [ref=e26]: E2E MMM32QE7
+              - generic [ref=e27]: submitted
+            - generic [ref=e28]:
+              - text: E2E Submission Test
+              - generic [ref=e29]: (X999999)
+            - generic [ref=e30]: 11 Mar 2026, 13:37
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - generic [ref=e33]: DFT MMM32673
+              - generic [ref=e34]: submitted
+            - generic [ref=e35]:
+              - text: Draft Test Driver
+              - generic [ref=e36]: (X888888)
+            - generic [ref=e37]: 11 Mar 2026, 13:37
+          - generic [ref=e38]:
+            - generic [ref=e39]:
+              - generic [ref=e40]: DFT MMM31AU9
+              - generic [ref=e41]: submitted
+            - generic [ref=e42]:
+              - text: Draft Test Driver
+              - generic [ref=e43]: (X888888)
+            - generic [ref=e44]: 11 Mar 2026, 13:36
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - generic [ref=e47]: E2E MMM2ZE0M
+              - generic [ref=e48]: submitted
+            - generic [ref=e49]:
+              - text: E2E Submission Test
+              - generic [ref=e50]: (X999999)
+            - generic [ref=e51]: 11 Mar 2026, 13:34
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]: DFT MMM2YTVV
+              - generic [ref=e55]: submitted
+            - generic [ref=e56]:
+              - text: Draft Test Driver
+              - generic [ref=e57]: (X888888)
+            - generic [ref=e58]: 11 Mar 2026, 13:34
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - generic [ref=e61]: DFT MMM2XYMQ
+              - generic [ref=e62]: submitted
+            - generic [ref=e63]:
+              - text: Draft Test Driver
+              - generic [ref=e64]: (X888888)
+            - generic [ref=e65]: 11 Mar 2026, 13:33
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - generic [ref=e68]: APIMMM2WBKW
+              - generic [ref=e69]: submitted
+            - generic [ref=e70]:
+              - text: API Test Driver
+              - generic [ref=e71]: (X999999)
+            - generic [ref=e72]: 11 Mar 2026, 13:32
+      - button "Sign Out" [ref=e73] [cursor=pointer]
+```

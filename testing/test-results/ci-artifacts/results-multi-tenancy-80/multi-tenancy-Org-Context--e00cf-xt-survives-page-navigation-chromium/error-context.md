@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img "Greythorn Contract Logistics" [ref=e6]
+      - generic [ref=e7]: test user
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e11]: Step 1 of 5
+      - generic [ref=e14]:
+        - heading "Vehicle Details" [level=2] [ref=e15]
+        - paragraph [ref=e16]: Enter the van driver's details and the vehicle information before starting the inspection.
+        - generic [ref=e17]:
+          - heading "Van Driver" [level=3] [ref=e18]
+          - generic [ref=e19]: HR Code *
+          - textbox "HR Code *" [ref=e20]:
+            - /placeholder: e.g. X000001
+          - generic [ref=e21]: Contractor Name *
+          - textbox "Contractor Name *" [ref=e22]:
+            - /placeholder: Driver's full name
+          - generic [ref=e23]: Site
+          - textbox "Site" [ref=e24]:
+            - /placeholder: e.g. BHX
+            - text: DBH3
+        - generic [ref=e25]:
+          - text: "Inspected by:"
+          - strong [ref=e26]: test user
+          - text: (TESTUSER01)
+        - generic [ref=e27]: Vehicle Registration (VRM) *
+        - generic [ref=e28]:
+          - textbox "Vehicle Registration (VRM) *" [ref=e29]:
+            - /placeholder: e.g. AB12 CDE
+          - button "Look up" [disabled] [ref=e30]
+        - generic [ref=e31]: Mileage *
+        - spinbutton "Mileage *" [ref=e32]
+        - generic [ref=e33]: Make & Model
+        - textbox "Make & Model" [ref=e34]:
+          - /placeholder: e.g. Ford Transit
+        - generic [ref=e35]: Colour
+        - textbox "Colour" [ref=e36]:
+          - /placeholder: e.g. White
+        - button "Continue to Photos" [disabled] [ref=e37]
+```

@@ -20,7 +20,10 @@
       "Bash(grep -r \"primary_colour\\\\|logo_url\\\\|--org-primary\\\\|branding\" ./testing --include=\"*.spec.ts\" 2>/dev/null | head -20)",
       "Bash(find /c/Users/miten/Documents/GitHub/cheklistr/testing -name \"*.spec.ts\" -o -name \"*.spec.tsx\" 2>/dev/null | head -20)",
       "Bash(which supabase:*)",
-      "Bash(which npx:*)"
+      "Bash(which npx:*)",
+      "Bash(find testing/test-results/ci-artifacts/results-* -name \"*.json\" -o -name \"*.txt\" 2>/dev/null | head -20)",
+      "Bash(gh run:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
