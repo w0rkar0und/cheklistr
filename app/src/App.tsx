@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/authStore';
 import { SessionExpiryOverlay } from './components/common/SessionExpiryOverlay';
 import { PwaInstallBanner } from './components/common/PwaInstallBanner';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
+import { requestLocationPermission } from './lib/nativeGeolocation';
 import { router } from './router';
 import './styles/global.css';
 
@@ -20,6 +21,11 @@ function App() {
       startSessionChecks(appSession.id);
     }
   }, [appSession?.id, startSessionChecks]);
+
+  // Request location permission early on native platforms
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
 
   return (
     <>

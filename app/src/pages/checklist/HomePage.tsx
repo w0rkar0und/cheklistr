@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 // useChecklistStore not needed here — draft is loaded in NewChecklistPage from IndexedDB
 import { signOut } from '../../lib/auth';
-import { supabase } from '../../lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, getFreshAccessToken } from '../../lib/supabase';
 import { getPendingCount, getDraft, deleteDraft } from '../../lib/offlineDb';
 import type { DraftFormState } from '../../lib/offlineDb';
 import type { Submission } from '../../types/database';
@@ -58,20 +58,34 @@ export function HomePage() {
     loadDraft();
   }, []);
 
-  // Load recent submissions for this user
+  // Load recent submissions for this user via raw fetch
+  // (bypasses supabase JS client which can hang during token refresh in WebView)
   useEffect(() => {
     const load = async () => {
       if (!profile) return;
       setLoadingSubs(true);
-      const { data, error } = await supabase
-        .from('submissions')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      try {
+        const accessToken = await getFreshAccessToken();
+        if (!accessToken) {
+          setLoadingSubs(false);
+          return;
+        }
 
-      if (!error && data) {
-        setRecentSubmissions(data as Submission[]);
+        const url = `${SUPABASE_URL}/rest/v1/submissions?user_id=eq.${profile.id}&order=created_at.desc&limit=10`;
+        const res = await fetch(url, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setRecentSubmissions(data as Submission[]);
+        }
+      } catch (err) {
+        console.error('[HOME] Failed to load submissions:', err);
       }
       setLoadingSubs(false);
     };
@@ -97,8 +111,10 @@ export function HomePage() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut(appSession?.id);
+  const handleSignOut = () => {
+    // Clear local state and navigate immediately — don't block on Supabase calls
+    // which can hang in the Capacitor WebView during token refresh
+    signOut(appSession?.id).catch(() => {});
     useAuthStore.getState().reset();
     navigate('/login', { replace: true });
   };

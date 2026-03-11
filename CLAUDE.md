@@ -201,8 +201,30 @@ Full schema detail: see `supabase/CLAUDE.md`.
 - Login smoke test: check for `.login-logo` image and "Never miss a step" tagline.
 - Multi-tenancy tests: use class-specific locators (`.header-title`, `.header-logo`, `.cheklistr-mark`) instead of alt-text selectors that matched multiple images after Cheklistr mark was added.
 
+### Session 4 — 11 March 2026: Android Runtime Fixes
+
+**Android location permission:**
+- Added `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, and `uses-feature` for GPS to `AndroidManifest.xml` — these were missing entirely, so the native permission dialog never appeared.
+- Moved `requestLocationPermission()` call from `NewChecklistPage` (checklist mount) to `App.tsx` (app startup) so the prompt appears immediately after launch.
+
+**Android adaptive icon centering:**
+- Regenerated all `ic_launcher_foreground.png` files with proper adaptive icon padding — icon occupies inner 66% (72/108dp safe zone), centred with transparent padding. Previously the brand PNG filled the entire canvas causing off-centre cropping.
+- Changed adaptive icon background from `#FFFFFF` to `#0F172A` (brand slate).
+- Replaced default Capacitor teal grid `ic_launcher_background.xml` with solid colour shape.
+- Removed default Capacitor vector foreground (`drawable-v24/ic_launcher_foreground.xml`).
+- Regenerated legacy `ic_launcher.png` and `ic_launcher_round.png` for pre-API-26 devices.
+
+**Supabase JS client hanging in Capacitor WebView:**
+- `HomePage.tsx` submissions query: replaced `supabase.from('submissions')` with raw `fetch()` + `getFreshAccessToken()` via PostgREST URL. The JS client's internal token refresh can hang indefinitely in the WebView.
+- `HomePage.tsx` sign out: made non-blocking — clears local state and navigates immediately, fires `signOut()` in background. Previously the `await` on `supabase.auth.signOut()` could hang, leaving the user stuck.
+- **Pattern confirmed:** Any Supabase JS client call that triggers internal `getSession()` can hang in the Capacitor WebView. Critical paths must use raw `fetch()` with `getFreshAccessToken()`. This now applies to: VRM lookup, submission sync, pending submissions sync, and home page submissions query.
+
+**Android build environment:**
+- Added Foojay toolchain resolver plugin to `android/settings.gradle` — Gradle auto-downloads Java 21 when required by Capacitor plugins (local machine only had Java 17 and 23).
+
 ### What's next
-- Test Android build on physical device (camera, GPS, biometrics, offline submission).
+- Test full Android flow on physical device (camera, GPS, biometrics, offline submission + sync).
+- Audit remaining `supabase.from()` calls in components for WebView hang risk — `auth.ts` functions (`checkSessionValidity`, `extendSession`, `createAppSession`) still use the JS client and may need the same raw fetch treatment.
 - iOS Capacitor setup (same pattern as Android — `npx cap add ios`, reuse native abstraction layer).
 - Consider conditionally disabling PWA service worker on native if caching conflicts arise.
 - The stale `app/ios/` directory from the old branch is still on main — clean up or regenerate when starting iOS work.
