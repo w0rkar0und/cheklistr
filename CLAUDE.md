@@ -119,6 +119,26 @@ Full schema detail: see `supabase/CLAUDE.md`.
 
 ---
 
+## Handoff Notes — 11 March 2026
+
+### What changed
+- **New E2E admin test user:** `GREYADMIN01` (role `admin`, Greythorn org) created in Supabase Auth + `users` table. M.PATEL is now `super_admin` only.
+- **GitHub secrets updated:** `E2E_ADMIN_USER_ID`/`PASSWORD` → `GREYADMIN01`. New `E2E_SUPER_ADMIN_USER_ID`/`PASSWORD` → `M.PATEL`. Local `testing/e2e/.env` updated to match.
+- **Playwright config** (`playwright.config.ts`): `chromium` and `mobile-chrome` projects now depend on `admin-auth-setup` so `admin.json` auth state exists for multi-tenancy tests that use `test.use({ storageState: adminAuthFile })`.
+- **AdminOrganisations.tsx**: Added `noValidate` to create and edit `<form>` elements so JS validation renders `.error-message` divs instead of browser-native tooltips.
+- **multi-tenancy.spec.ts**: SignedImage detail test skips on mobile viewport (sidebar overlays table rows).
+
+### What's fixed
+- Admin suite: 30/30 passing (was 0/30 — missing credentials)
+- Multi-tenancy suite: 24/24 passing, 1 skipped (was 7/23 — missing admin auth state)
+- Super-admin suite: 22/23 passing (was 0/23 — missing credentials). The 1 remaining failure (`empty name shows validation error`) will pass once the `noValidate` deploy hits production.
+
+### What's next
+- Verify the super-admin validation test passes in CI after Vercel deploys the `noValidate` change.
+- The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
+
+---
+
 ## Coding Conventions
 
 - TypeScript strict mode — no `any` types
