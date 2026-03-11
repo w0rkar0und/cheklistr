@@ -17,12 +17,6 @@ jobs:
       run:
         working-directory: supabase/scripts
     steps:
-      - name: Validate confirmation
-        if: inputs.confirm != 'purge'
-        run: |
-          echo "Confirmation required. Type 'purge' to proceed."
-          exit 1
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -34,21 +28,14 @@ jobs:
       - name: Install script dependencies
         run: npm install dotenv tsx
 
-      - name: Run SQL cleanup
+      - name: Purge database records
         env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          echo "Running purge-e2e-data.sql against production database…"
-
-          PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
-            "postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.trlrwnoapvcpszjbntso.supabase.co:5432/postgres" \
-            -f purge-e2e-data.sql
+          SUPABASE_URL: ${{ secrets.E2E_BASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx purge-e2e-data.ts
 
       - name: Purge storage files
         env:
           SUPABASE_URL: ${{ secrets.E2E_BASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx tsx purge-storage.ts
-
-      - name: Summary
-        run: echo "E2E test data purged successfully. Greythorn org + 3 core users preserved."
