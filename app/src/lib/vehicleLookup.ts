@@ -1,4 +1,4 @@
-import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from './supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, getFreshAccessToken } from './supabase';
 
 export interface VehicleLookupResult {
   found: boolean;
@@ -18,7 +18,7 @@ export interface VehicleLookupResult {
  */
 export async function lookupVehicle(vrm: string): Promise<VehicleLookupResult> {
   try {
-    const accessToken = getAccessTokenFromStorage();
+    const accessToken = await getFreshAccessToken();
     if (!accessToken) {
       return { found: false, make: null, model: null, colour: null, error: 'Not authenticated — please log out and back in.' };
     }

@@ -8,7 +8,7 @@ import { VehiclePhotosStep } from '../../components/checklist/VehiclePhotosStep'
 import { ChecklistSectionView } from '../../components/checklist/ChecklistSectionView';
 import { DefectsStep } from '../../components/checklist/DefectsStep';
 import { ReviewStep } from '../../components/checklist/ReviewStep';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, getAccessTokenFromStorage } from '../../lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, getFreshAccessToken } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
 import { savePendingSubmission, getPendingCount, saveDraft, deleteDraft, getDraft } from '../../lib/offlineDb';
 import { getCurrentPosition, requestLocationPermission } from '../../lib/nativeGeolocation';
@@ -225,8 +225,8 @@ export function NewChecklistPage() {
     try {
       // ── Pre-flight: read auth token directly from localStorage ──
       // supabase.auth.getSession() hangs during token refresh, so we bypass it entirely.
-      console.log('[SUBMIT] Pre-flight: reading token from localStorage…');
-      const accessToken = getAccessTokenFromStorage();
+      console.log('[SUBMIT] Pre-flight: getting fresh token…');
+      const accessToken = await getFreshAccessToken();
       if (!accessToken) {
         throw new Error('No auth token found. Please log out and log back in.');
       }

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPendingSubmissions, deletePendingSubmission } from '../../lib/offlineDb';
 import { syncSubmission } from '../../lib/syncSubmission';
-import { getAccessTokenFromStorage } from '../../lib/supabase';
+import { getFreshAccessToken } from '../../lib/supabase';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import type { PendingSubmission } from '../../lib/offlineDb';
 import type { SyncProgress } from '../../lib/syncSubmission';
@@ -41,7 +41,7 @@ export function PendingSubmissionsPage() {
       return;
     }
 
-    const accessToken = getAccessTokenFromStorage();
+    const accessToken = await getFreshAccessToken();
     if (!accessToken) {
       setError('No auth token found. Please log out and log back in.');
       return;
@@ -89,7 +89,7 @@ export function PendingSubmissionsPage() {
       return;
     }
 
-    const accessToken = getAccessTokenFromStorage();
+    const accessToken = await getFreshAccessToken();
     if (!accessToken) {
       setError('No auth token found. Please log out and log back in.');
       return;
