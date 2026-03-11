@@ -34,16 +34,14 @@ jobs:
       - name: Install script dependencies
         run: npm install dotenv tsx
 
-      - name: Run SQL cleanup via Supabase Management API
+      - name: Run SQL cleanup
         env:
-          SUPABASE_PROJECT_REF: trlrwnoapvcpszjbntso
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Running purge-e2e-data.sql against production database…"
 
-          # Use psql via Supabase pooler connection
           PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
-            "postgresql://postgres.${SUPABASE_PROJECT_REF}:${SUPABASE_DB_PASSWORD}@aws-0-eu-west-2.pooler.supabase.com:6543/postgres" \
+            "postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.trlrwnoapvcpszjbntso.supabase.co:5432/postgres" \
             -f purge-e2e-data.sql
 
       - name: Purge storage files
