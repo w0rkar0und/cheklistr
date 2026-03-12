@@ -1,21 +1,24 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ── Capacitor WebView JS bridge ──────────────────────────────
+# Keep the JavaScript interface so the WebView ↔ native bridge works
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep Capacitor plugin classes (registered by reflection)
+-keep class com.getcapacitor.** { *; }
+-keep class com.capacitorjs.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ── Capacitor plugins used by Cheklistr ─────────────────────
+-keep class com.capacitorjs.plugins.camera.** { *; }
+-keep class com.capacitorjs.plugins.geolocation.** { *; }
+-keep class com.capacitorjs.plugins.preferences.** { *; }
+-keep class com.capacitorjs.plugins.network.** { *; }
+-keep class com.capacitorjs.plugins.splashscreen.** { *; }
+-keep class com.aparajita.capacitor.biometricauth.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# ── AndroidX ────────────────────────────────────────────────
+-keep class androidx.core.content.FileProvider { *; }
+
+# ── Preserve line numbers for crash reporting ───────────────
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

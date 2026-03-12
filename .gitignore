@@ -2,3 +2,7 @@ app/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/mpatel.xcuserdatad/User
 app/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/mpatel.xcuserdatad/UserInterfaceState.xcuserstate
 E2E_UPDATE_PROMPT_MULTI_TENANCY.md
 app/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/mpatel.xcuserdatad/UserInterfaceState.xcuserstate
+
+# Android signing
+*.keystore
+*.jks
