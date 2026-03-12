@@ -1,5 +1,8 @@
 name: E2E Tests
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # ─── When to run ───────────────────────────────────────────────
 on:
   # On push to main or staging — only when app source code changes
