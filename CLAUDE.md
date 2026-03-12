@@ -37,8 +37,9 @@ This is **not** a generic task manager. It is purpose-built for fleet inspection
 ## Environments
 
 - **Production:** cheklistr.app (Vercel) + Supabase project `trlrwnoapvcpszjbntso`
-- **Staging:** NONE — flow is `local dev → push to main → Vercel auto-deploys → production`
-- **E2E tests:** Run against live production URL via GitHub Actions (60s Vercel deploy wait)
+- **Staging:** staging.cheklistr.com (Vercel preview, `staging` branch) + Supabase project `cnrjmuqcilnnucfhnbgi`
+- **E2E tests:** Run against staging or production URL via GitHub Actions (60s Vercel deploy wait)
+- **Workflow:** feature branch → PR to `staging` → E2E on staging → PR to `main` → production
 
 ---
 
@@ -222,6 +223,30 @@ Full schema detail: see `supabase/CLAUDE.md`.
 **Android build environment:**
 - Added Foojay toolchain resolver plugin to `android/settings.gradle` — Gradle auto-downloads Java 21 when required by Capacitor plugins (local machine only had Java 17 and 23).
 
+### Session 5 — 12 March 2026: Staging Environment
+
+**Staging environment stood up:**
+- New Supabase project `cnrjmuqcilnnucfhnbgi` (EU West 2) with all 18 migrations applied.
+- Vercel preview domain `staging.cheklistr.com` linked to `staging` branch.
+- Vercel env vars scoped: production vars → Production only, staging vars → Preview only.
+- GitHub secrets added: `E2E_STAGING_BASE_URL`, `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`.
+- Three test users seeded via Auth Admin API: M.PATEL (super_admin), GREYADMIN01 (admin), TESTUSER01 (site_manager).
+- `main` branch protected via GitHub ruleset — requires PR, blocks force push and deletion.
+
+**Code changes:**
+- `app/vite.config.ts`: PWA cache rule parameterized — reads Supabase ref from `VITE_SUPABASE_URL` env var.
+- `testing/e2e/tests/helpers/supabase-api.ts`: Reads `SUPABASE_URL`/`SUPABASE_ANON_KEY` from env vars with production fallback.
+- `testing/e2e/.env.example`: Added `SUPABASE_URL` and `SUPABASE_ANON_KEY` entries.
+- `.github/workflows/e2e-tests.yml`: Triggers on `staging` branch, env-aware `.env` creation injects staging or production secrets.
+
+**Lesson learned:** Creating `auth.users` rows via raw SQL INSERT produces corrupted identity records that break the Auth Admin API. Always use the Auth Admin API (`POST /auth/v1/admin/users`) to create users — it sets up `auth.users`, `auth.identities`, and password hashes correctly.
+
+**Deployment workflow:**
+```
+feature branch → PR to staging → Vercel deploys to staging.cheklistr.com → E2E tests on staging
+staging → PR to main → merge → Vercel deploys to cheklistr.app (production)
+```
+
 ### What's next
 - Test full Android flow on physical device (camera, GPS, biometrics, offline submission + sync).
 - Audit remaining `supabase.from()` calls in components for WebView hang risk — `auth.ts` functions (`checkSessionValidity`, `extendSession`, `createAppSession`) still use the JS client and may need the same raw fetch treatment.
@@ -229,6 +254,7 @@ Full schema detail: see `supabase/CLAUDE.md`.
 - Consider conditionally disabling PWA service worker on native if caching conflicts arise.
 - The stale `app/ios/` directory from the old branch is still on main — clean up or regenerate when starting iOS work.
 - The `testing/e2e/.env` is gitignored — any new dev machine needs credentials populated manually or from GitHub secrets.
+- Deploy `vehicle-lookup` edge function to staging Supabase project (with `UKVD_API_KEY` secret).
 
 ---
 

@@ -3,13 +3,20 @@
 **Directory:** `testing/`
 **Framework:** Playwright (chromium + mobile-chrome)
 **CI:** GitHub Actions — `.github/workflows/e2e-tests.yml`
-**Target:** Live production URL (cheklistr.app) — there is NO staging environment
+**Target:** Staging (staging.cheklistr.com) or production (cheklistr.app) depending on branch
 
 ---
 
-## Important: Tests Run Against Production
+## Environment-Aware Testing
 
-E2E tests run against the **live deployed site** after Vercel deploys from `main`. The CI workflow waits 60 seconds post-push for Vercel to complete deployment before running tests. Do not remove this wait.
+E2E tests run against **staging** when triggered from the `staging` branch, and against **production** when triggered from `main`. The CI workflow determines the target environment automatically:
+
+- **Push to `staging`** → tests use `E2E_STAGING_BASE_URL` + `STAGING_SUPABASE_URL`/`STAGING_SUPABASE_ANON_KEY`
+- **Push to `main`** → tests use `E2E_BASE_URL` (production)
+
+The `supabase-api.ts` test helper reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from environment variables, falling back to production values if unset.
+
+The CI workflow waits 60 seconds post-push for Vercel to complete deployment before running tests. Do not remove this wait.
 
 ---
 
