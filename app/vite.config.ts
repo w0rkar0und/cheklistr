@@ -2,6 +2,11 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Extract Supabase project ref for runtime cache pattern.
+// Falls back to production ref so `vite.config.ts` works without an .env file.
+const supabaseUrl = process.env.VITE_SUPABASE_URL ?? 'https://trlrwnoapvcpszjbntso.supabase.co';
+const supabaseRef = new URL(supabaseUrl).hostname.split('.')[0];
+
 export default defineConfig({
   plugins: [
     react(),
@@ -43,7 +48,7 @@ export default defineConfig({
         // Runtime caching for Supabase API calls
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/trlrwnoapvcpszjbntso\.supabase\.co\/rest\/v1\/.*/i,
+            urlPattern: new RegExp(`^https://${supabaseRef}\\.supabase\\.co/rest/v1/.*`, 'i'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api-cache',

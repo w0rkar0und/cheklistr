@@ -2,9 +2,9 @@ name: E2E Tests
 
 # ─── When to run ───────────────────────────────────────────────
 on:
-  # On push to main — only when app source code changes
+  # On push to main or staging — only when app source code changes
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'app/src/**'
       - 'app/public/**'
@@ -13,9 +13,9 @@ on:
       - 'app/package.json'
       - 'app/vercel.json'
 
-  # On PRs targeting main — only when app source code changes
+  # On PRs targeting main or staging — only when app source code changes
   pull_request:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'app/src/**'
       - 'app/public/**'
@@ -91,9 +91,33 @@ jobs:
           echo "Waiting 60 seconds for Vercel deployment to complete…"
           sleep 60
 
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/staging" || "${{ github.base_ref }}" == "staging" ]]; then
+            echo "target=staging" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=production" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create .env file
         run: |
-          cat > .env << ENVEOF
+          if [[ "${{ steps.env.outputs.target }}" == "staging" ]]; then
+            cat > .env << ENVEOF
+          BASE_URL=${{ secrets.E2E_STAGING_BASE_URL }}
+          SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          TEST_ORG_SLUG=greythorn
+          TEST_USER_ID=${{ secrets.E2E_TEST_USER_ID }}
+          TEST_USER_PASSWORD=${{ secrets.E2E_TEST_USER_PASSWORD }}
+          ADMIN_USER_ID=${{ secrets.E2E_ADMIN_USER_ID }}
+          ADMIN_USER_PASSWORD=${{ secrets.E2E_ADMIN_USER_PASSWORD }}
+          SUPER_ADMIN_USER_ID=${{ secrets.E2E_SUPER_ADMIN_USER_ID }}
+          SUPER_ADMIN_USER_PASSWORD=${{ secrets.E2E_SUPER_ADMIN_USER_PASSWORD }}
+          E2E_RETRIES=${{ github.event_name == 'workflow_dispatch' && inputs.retries || '1' }}
+          ENVEOF
+          else
+            cat > .env << ENVEOF
           BASE_URL=${{ secrets.E2E_BASE_URL }}
           TEST_ORG_SLUG=greythorn
           TEST_USER_ID=${{ secrets.E2E_TEST_USER_ID }}
@@ -104,6 +128,7 @@ jobs:
           SUPER_ADMIN_USER_PASSWORD=${{ secrets.E2E_SUPER_ADMIN_USER_PASSWORD }}
           E2E_RETRIES=${{ github.event_name == 'workflow_dispatch' && inputs.retries || '1' }}
           ENVEOF
+          fi
 
       # Cache the entire working directory so suite jobs skip install
       - name: Cache workspace

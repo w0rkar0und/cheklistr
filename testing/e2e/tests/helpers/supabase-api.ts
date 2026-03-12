@@ -7,8 +7,12 @@
  */
 
 // ─── Supabase project constants ─────────────────────────────────
-const SUPABASE_URL = 'https://trlrwnoapvcpszjbntso.supabase.co';
+// Read from environment to support staging/production switching.
+// Falls back to production values for backward compatibility.
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ?? 'https://trlrwnoapvcpszjbntso.supabase.co';
 const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ??
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRybHJ3bm9hcHZjcHN6amJudHNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3OTE2NTQsImV4cCI6MjA4ODM2NzY1NH0.LImmqc2SS6Fz_Ftijfdn7DvJui96jGSoJ7XCvzK8OY4';
 
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
